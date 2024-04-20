@@ -4,7 +4,7 @@
  *  
  *****
  * 
- * SSDisplay V1.0.0, April 2024
+ * SSDisplay V1.1.0, April 2024
  * Copyright (C) 2024 D.L. Ehnebuske
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy

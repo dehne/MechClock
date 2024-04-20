@@ -42,8 +42,9 @@
  * Compile-time constants
  * 
  **/
-#define ILL_DEFAULT_DARK    (0.020)                 // If the light level falls below this, it's dark; turn off illumination
+#define ILL_DEFAULT_DARK    (0.025)                 // If the light level falls below this, it's dark; turn off illumination
 #define ILL_DEFAULT_BRIGHT  (0.125)                 // If the light level rises above thus, its bright; max out illumination
+#define ILL_N_AVG           (10)                    // How many ambient illumination samples to average over
 
 //#define ILL_DEBUG                                   // Uncomment to enable debug printing
 
@@ -57,6 +58,12 @@ public:
      * @param i      The PWM-capable GPIO pin to which the LED light strip is attached
      */
     Illuminate(byte p, byte i);
+
+    /**
+     * @brief   Get the Illuminate object up and running. Call once, typically in setup()
+     * 
+     */
+    void begin();
 
     /**
      * @brief   Let Illuminate do its thing. Invoke as often as desired to control the level of 
@@ -101,4 +108,14 @@ private:
     byte iPin;                  // The GPIO pin the LED strip is attached to
     float dark;                 // The light level below which it's considered dark
     float bright;               // The light level above which it's considered bright
+    int curLevel;               // Current light output level: 0 .. 255
+    int samples[ILL_N_AVG];     // The samples that go into the ambient illumination average
+    int8_t sIx;                 // The index into samples into which to store the next sample taken
+
+    /**
+     * @brief   Get the light level 0.0 (completely dark) to 1.0 (blindingly bright)
+     * 
+     * @return float    Retrurns ~0.0 with no light and ~1.0 in full light.
+     */
+    float getLightLevel();
 };

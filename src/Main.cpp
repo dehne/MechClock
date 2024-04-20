@@ -1,16 +1,16 @@
 /****
  * @file main.cpp
- * @version 1.0.0
- * @date April 3, 2024
+ * @version 1.1.0
+ * @date April 20, 2024
  * 
- * This is a project to drive a mechanical seven-segment digital clock. The clock consists of four 
+ * This is the firmware for a mechanical seven-segment digital clock. The clock consists of four 
  * seven-segment digits forming a conventional digital clock display. Each seven-segment digit is 
  * driven by a 28BYJ-48 geared-down stepper motor. Rotating the stepper's shaft moves seven ganged 
  * cams, one cam for each segment. The cams cause the segments to protrude from the face of the 
  * display, or retract into it, as necessary to form the digit to be displayed.
  * 
  * To make the display easier to read, the clock is lit from an angle above with an array of SMD 
- * LEDs so that the segments cast shadows when the protrude. The brightness of the LEDs is 
+ * LEDs so that the segments cast shadows when they protrude. The brightness of the LEDs is 
  * adjusted based on the ambient illumination, bright when it's daytime, dimmer when the room 
  * lights are on and off completely when the room light are switched off.
  * 
@@ -43,12 +43,12 @@
 
 #define SIGNATURE           (0x437d)                    // "Signature" to id EEPROM contents as ours
 #define PAUSE_MS            (500)                       // millis() to pause between various initialization retries
-#define SERIAL_WAIT_MS      (10000)                     // millis() to wait for Serial to begin before charging ahead
+#define SERIAL_WAIT_MS      (20000)                     // millis() to wait for Serial to begin before charging ahead
 #define COUNT_PAUSE_MS      (2000)                      // millis() to pause between digits during 'count' command
 #define WIFI_CONN_MAX_RETRY (3)                         // How many times to retry WiFi.begin() before giving up
 #define NTP_MAX_RETRY       (20)                        // How many times to retry getting the system clock set by NTP
 #define CONFIG_ADDR         (0)                         // Address of config structure in persistent memory
-#define BANNER              "MechClock v0.1.0"
+#define BANNER              "MechClock v1.1.0"
 
 #define TIMEZONE            "PST8PDT,M3.2.0,M11.1.0"    // Default time zone definition in POSIX format
 
@@ -81,7 +81,6 @@
 // Illumination control stuff
 #define LIGHT_SENSE         (26)    // Phototransistor pin: Analog voltage proportional to light intensity
 #define LIGHT_CONTROL       (22)    // PWM pin for illumination control
-#define ILLUMINATE_MS       (2500)  // How often to update illumination (millis())
 
 /****
  *  Type definitions
@@ -568,6 +567,7 @@ void setup() {
     Serial.println("Initializing the display.");
     display.begin(config.jog);                          // Get the display going
     display.setStyle24(config.style24);
+    illuminate.begin();
 
     // Show we're ready to go
     Serial.print("Type 'h' or 'help' for a command summary.\n");
@@ -575,17 +575,12 @@ void setup() {
 
 void loop() {
     static int lastMin = -1;                // Minutes after the hour that we last updated the display
-    static unsigned long lastMillis = 0;    // millis() last time we updated the illumination
 
     // Let the command interpreter do its thing
     ui.run();
 
-    // Update the illuminaton level every ILLUMINATE_MS millis()
-    unsigned long curMillis = millis();
-    if (curMillis - lastMillis >= ILLUMINATE_MS) {
-        illuminate.run();
-        lastMillis = curMillis;
-    }
+    // Update the illuminaton level
+    illuminate.run();
 
     // If the display is supposed to be showing the time
     if (clockIsSet && !testMode) {

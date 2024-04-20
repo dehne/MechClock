@@ -9,7 +9,7 @@
  *
  *****
  * 
- * ULN2003Pico V1.0.0, April 2024
+ * ULN2003Pico V1.0.1, April 2024
  * Copyright (C) 2020-2024 D.L. Ehnebuske
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -63,9 +63,9 @@ bool repeatingTimerCallback(repeating_timer_t *rt) {
     digitalWrite(LED_BUILTIN, HIGH);
     #endif
     unsigned long curMicros = micros();
-    unsigned long nextDispMicros = curMicros + UL_TIMER_INTERVAL;
     for (byte i = 0; i <= maxObjNo; i++) {
         // Deal with a ULN2003 object instance i
+        unsigned long diff = min(microsNextStep[i] - curMicros, curMicros - microsNextStep[i]);
         if (stepsToGo[i] != 0 && microsNextStep[i] - UL_MAX_JITTER <= curMicros) {
             // Dispatch a step
             phase[i] = (phase[i] + (stepsToGo[i] < 0 ? 1 : 7)) & 0x7;
@@ -86,9 +86,6 @@ bool repeatingTimerCallback(repeating_timer_t *rt) {
             stepsToGo[i] -= stepsToGo[i] > 0 ? 1 : -1;
             if (stepsToGo[i] != 0) {
                 microsNextStep[i] += usPerStep[i];
-                if (microsNextStep[i] < nextDispMicros) {
-                    nextDispMicros = microsNextStep[i];
-                }
             }
         }
     }

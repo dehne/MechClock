@@ -3,17 +3,17 @@
  * This file is a portion of the package SSDisplay. It drives a digital clock display consisting 
  * of four electromechanical seven-segment digit display modules to display two digits for the 
  * hour and two for the minutes. Each module has a 28BYJ-48 stepper motor to move it and a 4133 
- * Hall-effect sensor that may be used to "home" each module at power on so that it moves to a 
- * known home position at startup. 
+ * Hall-effect sensor that is used to "home" each module at power on so that it moves to a known 
+ * home position at startup. 
  * 
- * Driving a module's stepper by 1/10 of a turn changes the display by +/- one, depending on the 
- * direction it's turned. In a 1:1 ratio, the stepper turns seven cams ganged together. Each cam 
+ * Driving a module's stepper by 1/5 of a turn changes the display by +/- one, depending on the 
+ * direction it's turned. In a 2:1 ratio, the stepper turns seven cams ganged together. Each cam 
  * controls one segment of the module's digit display, extending or retracting it to cause the 
  * appropriate combination of segements to form the desired digit.
  * 
  *****
  * 
- * SSDisplay V1.0.0, April 2024
+ * SSDisplay V1.1.0, April 2024
  * Copyright (C) 2024 D.L. Ehnebuske
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -46,8 +46,8 @@
  * Compile-time constants
  * 
  **/
-#define SSD_STEPS_PER_SEC       (200)                   // How many steps per second to drive display steppers
-#define SSD_STEPS_PER_REV       (UL_STEPS_PER_REV)      // Number of stepper steps per rev of mechanical display cams
+#define SSD_STEPS_PER_SEC       (400)                   // How many steps per second to drive display steppers
+#define SSD_STEPS_PER_REV       (2 * UL_STEPS_PER_REV)  // Number of stepper steps per rev of mechanical display cams
 #define SSD_N_MODULES           (4)                     // Number of modules in the display
 #define SSD_MIN_MODULE          (0)                     // The number of the unit minutes module
 #define SSD_10MIN_MODULE        (1)                     // The number of the ten minutes module
@@ -83,7 +83,7 @@ public:
     /**
      * @brief Initialize the display, making it ready to run. Usually done once in setuo()
      * 
-     * @param   o   The jog offset values -- number of steps from the Hall sensor trigger to the 
+     * @param   o   The home offset values -- number of steps from the Hall sensor trigger to the 
      *              true home position -- to assume for each module.
      * 
      */

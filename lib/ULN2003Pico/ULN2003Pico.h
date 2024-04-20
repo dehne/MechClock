@@ -69,7 +69,7 @@
  *          - aBool = isMoving()        true if taking steps
  *****
  * 
- * ULN2003Pico V1.0.0, April 2024
+ * ULN2003Pico V1.0.1, April 2024
  * Copyright (C) 2020-2024 D.L. Ehnebuske
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
