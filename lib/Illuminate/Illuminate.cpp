@@ -4,7 +4,7 @@
  *  
  *****
  * 
- * Illuminate V1.0.0, April 2024
+ * Illuminate V1.0.1, May 2024
  * Copyright (C) 2024 D.L. Ehnebuske
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -43,6 +43,7 @@ void Illuminate::begin() {
         samples[i] = analogRead(pPin);
     }
     sIx = 0;
+    updateMillis = millis();
 }
 
 void Illuminate::run() {
@@ -57,6 +58,9 @@ void Illuminate::run() {
      * 
      * 
      */
+    if (millis() - updateMillis < ILL_MIN_CHG_MILLIS) {
+        return;
+    }
     float curAmbient = getLightLevel();
     int tgtLevel = 255 * (curAmbient - dark) / (bright - dark);
     tgtLevel = tgtLevel > 255 ? 255 : tgtLevel < 0 ? 0 : tgtLevel;
@@ -68,6 +72,7 @@ void Illuminate::run() {
     #endif
     curLevel = tgtLevel > curLevel ? curLevel + 1 : curLevel - 1;
     analogWrite(iPin, curLevel);
+    updateMillis = millis();
 }
 
 bool Illuminate::setAmbientBounds(float darkToLamps, float lampsToDay) {
