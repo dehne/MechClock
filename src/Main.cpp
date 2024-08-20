@@ -1,18 +1,71 @@
 /****
  * @file main.cpp
- * @version 1.1.0
- * @date April 20, 2024
+ * @version 1.0.0
+ * @date August, 2024
  * 
- * This is the firmware for a mechanical seven-segment digital clock. The clock consists of four 
- * seven-segment digits forming a conventional digital clock display. Each seven-segment digit is 
- * driven by a 28BYJ-48 geared-down stepper motor. Rotating the stepper's shaft moves seven ganged 
- * cams, one cam for each segment. The cams cause the segments to protrude from the face of the 
- * display, or retract into it, as necessary to form the digit to be displayed.
+ * This is the firmware for a moon phase display. The display consists of a picture of the full 
+ * moon, on top of which there is a springy, flexible "terminator" that runs between two pivots 
+ * placed at the northernmost and southernmost points of the moon photo. The northern one is free 
+ * to turn. One end of the terminator is attached to this pivot. The terminator material passes 
+ * across the photo to the southern pivot. It slides through that pivot and continues beyond it. 
+ * The southern pivot can be twisted by a stepper motor (pvMotor). This twists the terminator 
+ * material, set the angle it makes with the southern extremity of the photo. The northern, 
+ * freely rotating, pivot assumes whatever angle the forces on it dictate. 
  * 
- * To make the display easier to read, the clock is lit from an angle above with an array of SMD 
- * LEDs so that the segments cast shadows when they protrude. The brightness of the LEDs is 
- * adjusted based on the ambient illumination, bright when it's daytime, dimmer when the room 
- * lights are on and off completely when the room light are switched off.
+ * As noted, the material forming the terminator is longer than the distance from the northern 
+ * pivot to the southern one. After it passes through the southern (driven) pivot, its end is 
+ * attached to the travelling part of a leadscrew mechanism the whole of which rotates with the 
+ * pivot. The leadscrew mechanism, driven by another stepper motor (lsMotor) pushes or pulls the 
+ * terminator material, sliding it through the pivot. Thus the position of the leadscrew 
+ * determins the length of the terminator material the runs across the photo between the two 
+ * pivots. 
+ * 
+ * By coordinating the operation of the two steppers we can form the terminator into various 
+ * curves crossing the face of the photo. By doing so correctly we can approximate the the curves 
+ * real terminator takes as it crosses the face of the real moon. Well, close enough to make a 
+ * nice mechanical moon phase display, anyway.
+ * 
+ * Based on calibration runs of the as-built mechanism, if the position of the leadscrew (ls) as 
+ * a function of pivot position (pv) is
+ * 
+ *      ls = 497671 + 30.5pv - 0.201pv^2
+ * 
+ * where -1600 <= pv <= 1600, the result is a (semi-credible) terminator path across the moon 
+ * photo. (Here, ls is a measure of how much terminator material is stored in the leadscrew 
+ * mechanism, so the length across the photo in inversely proportional to it. Positions of both 
+ * motors is measured in steps.) 
+ * 
+ * For the purposes of the display, I've divided a lunation into 60 phases. Phase 0 is a new moon, 
+ * phase 16 is the first quarter, phase 30 is the full moon and phase 45 is the third quarer moon. 
+ * The transition from phase 59 to 0 brings us back to the new moon of the next lunation.
+ * 
+ * At the start of a lunation (new moon -- phase 0), pv is at its minimum (-1600) and the 
+ * terminator is at its longest and is bent strongly to the right (the display is for earth's 
+ * northern hemisphere). As time progresses, the phases increase step by step, showing the waxing 
+ * crescent progression. At each phase, the steppers are operated to form the appropriate 
+ * terminator. During the transition from phase 15 to 16, the terminator begins to bend to the 
+ * left marking the progress of the gibbous moon until, at phase 29, it is at its maximum, bent 
+ * strongly to the left at full moon. The transition from phase 29 to 30 involves moving the 
+ * terminator from full left extension to full right so that it is in position to show the start 
+ * of the waning gibbous moon. As the phases continue, the terminator makes its way across the 
+ * moon photo, marking the lunation's waning phases, until, at the transition from phase 59 to 0, 
+ * we're back at the new moon. Like the transition from phase 29 to 30, the transition from phase 
+ * 59 to 0 requires the terminator to be reset from its extreme left position to its extreme 
+ * right one.
+ * 
+ * In addition to the terminator and moon photo, the display has two low angle light sources that 
+ * shine aross the moon photo, one from right to left, and the other from left to right. The 
+ * terminator material stands tall enough above the photo to keep the light from shining on the 
+ * part of the photo on the side away from the light source. Thus when one light source is on and 
+ * the other is off, the part of the moon photo on the same side is illuminated, but the part of 
+ * the photo on the other side is in (relative) darkness. 
+ * 
+ * In phases 0 - 29, only the right source is turned on, thus illuminating part of the moon phot 
+ * corresponding to what's lit during the waxing phases of the lunation. During the full moon 
+ * transition from phase 29 to 30, during which the terminator is reset, both sources are lit. 
+ * During phases 30 - 59, only the right source is lit, lighting the part corresponding to what's 
+ * lit during the moon's waning phases. During the new-moon transition from phase 59 to phase 0, 
+ * while the terminator is reset, neither light source is lit.
  * 
  *****
  * 
@@ -38,64 +91,55 @@
 #include <EEPROM.h>                                     // EEPROM emulation for the Pico
 #include <WiFi.h>                                       // Pico WiFi support
 #include <CommandLine.h>                                // Terminal command line support
-#include <SSDisplay.h>                                  // The 7-segment display device
-#include <Illuminate.h>                                 // The illumination control mechanism
+#include <MoonDisplay.h>                                // The moon display mechanism
 
-#define SIGNATURE           (0x437d)                    // "Signature" to id EEPROM contents as ours
-#define PAUSE_MS            (500)                       // millis() to pause between various initialization retries
+//#define DEBUG                                           // Uncomment to enable debug printing
+
+#define FINGERPRINT         (0x1656)                    // Our fingerprint (to see if EEProm has our stuff)
+#define PAUSE_MILLIS        (500)                       // millis() to pause between various initialization retries
+#define BLINK_ON_MILLIS     (50)                        // millis() LED blinks on to show we're actually running
+#define BLINK_OFF_MILLIS    (10000)                     // millis() LED blinks off to show we're actually running
 #define SERIAL_WAIT_MS      (20000)                     // millis() to wait for Serial to begin before charging ahead
-#define COUNT_PAUSE_MS      (2000)                      // millis() to pause between digits during 'count' command
 #define WIFI_CONN_MAX_RETRY (3)                         // How many times to retry WiFi.begin() before giving up
 #define NTP_MAX_RETRY       (20)                        // How many times to retry getting the system clock set by NTP
 #define CONFIG_ADDR         (0)                         // Address of config structure in persistent memory
-#define BANNER              "MechClock v1.1.0"
+#define BANNER              "MoonDisplay V1.0.0"
+#define LUNAR_MONTH         (29.53059)                  // The (average) length of the lunar cycle in days
+#define PHASE_MILLIS        (42524050)                  // The interval in ms between display phase changes (29.53059/60 days)
 
 #define TIMEZONE            "PST8PDT,M3.2.0,M11.1.0"    // Default time zone definition in POSIX format
 
-#define LED                 (LED_BUILTIN)               // Blink the LED attached to this GPIO
+#define LED                 (LED_BUILTIN)               // Use the LED attached to this pin
 
-// GPIO pins to which the steppers are attached
-#define MINUTE_IN1          (21)
-#define MINUTE_IN2          (20)
-#define MINUTE_IN3          (19)
-#define MINUTE_IN4          (18)
-#define MINUTE10_IN1        (2)
-#define MINUTE10_IN2        (3)
-#define MINUTE10_IN3        (4)
-#define MINUTE10_IN4        (5)
-#define HOUR_IN1            (6)
-#define HOUR_IN2            (7)
-#define HOUR_IN3            (8)
-#define HOUR_IN4            (9)
-#define HOUR10_IN1          (10)
-#define HOUR10_IN2          (11)
-#define HOUR10_IN3          (12)
-#define HOUR10_IN4          (13)
+// Stepper motor pin definitions
+#define PV_IN1              (2)                         // Pivot motor
+#define PV_IN2              (3)
+#define PV_IN3              (4)
+#define PV_IN4              (5)
+#define LS_IN1              (6)                         // Leadscrew motor
+#define LS_IN2              (7)
+#define LS_IN3              (8)
+#define LS_IN4              (9)
 
-// GPIO pins to which the limit Hall-effect sensors are attached
-#define MINUTE_HOME         (14)
-#define MINUTE10_HOME       (15)
-#define HOUR_HOME           (16)
-#define HOUR10_HOME         (17)
-
-// Illumination control stuff
-#define LIGHT_SENSE         (26)    // Phototransistor pin: Analog voltage proportional to light intensity
-#define LIGHT_CONTROL       (22)    // PWM pin for illumination control
+// Illuminator pin definitions
+#define IL_IN1              (11)
+#define IL_IN2              (10)
 
 /****
  *  Type definitions
  ****/
-struct config_t {   // Type definition for configuration data stored in "EEPROM" (actually flash memory in the rp2040)
-    uint16_t signature;             // How we guess whether this is our config data
-    char ssid[33];                  // The WiFi SSID
-    char pw[33];                    // The WiFi password
-    char timezone[49];              // The timezone in POSIX format
-    int16_t jog[SSD_N_MODULES];     // The jog values (offset from Hall-effect home) for each of the digits of the display
-    bool style24;                   // True if the display style is 24-hour (e.g., 13:00), false if 12-hour (e.g., 1:00)
-    float dark;                     // Ambient illumination boundary between dark and normal indoor lighting
-    float bright;                   // Ambient illumination boundary between normal indoor lighting and daylight
+struct nvState_t {  // Type definition for configuration data stored in "EEPROM" (actually flash memory in the rp2040)
+    int16_t fingerprint;                // Value to tell whether EEPROM contents is ours
+    char ssid[33];                      // The WiFi SSID
+    char pw[33];                        // The WiFi password
+    char timezone[49];                  // The timezone in POSIX format
+    int16_t curPhase;                   // The currently displayed phase
+    boolean testing;                    // True if in testing mode false if running normally
 };
 
+/****
+ * Constants
+ ****/
 // A tm structure defining a time that's earlier than now: Jan 1, 2024
 // Make it this way because C time_t values are, technically, opaque
 struct tm tmDawnOfHistory {
@@ -107,70 +151,101 @@ struct tm tmDawnOfHistory {
     .tm_year = 2024 - 1900, // tm_year is 1900-based
     .tm_isdst = 0
 };
-
-/****
- * Constants
- ****/
 const time_t dawnOfHistory = mktime(&tmDawnOfHistory);
+
+// There was a new moon at 22:57UTC on JUly 5, 2024. That's what we'll use as the first new moon
+struct tm tmFirstNewMoon {
+    .tm_sec = 0,            // tm_sec is 0-based
+    .tm_min = 57,           // tm_min is 0-based
+    .tm_hour = 22,          // tm_hour is 0-based
+    .tm_mday = 5,           // tm_mday is 1-based
+    .tm_mon = 7 - 1,        // tm_mon is 0-based
+    .tm_year = 2024 - 1900, // tm_year is 1900-based
+    .tm_isdst = 0
+};
+const time_t firstNewMoon = mktime(&tmFirstNewMoon);
+
+const nvState_t defaultState = {
+    .fingerprint = FINGERPRINT,     // How we recognize the content as ours
+    .ssid = "Set the SSID",         // Place holder for SSID
+    .pw = "Set the PW",             // Place holder for Password
+    .timezone = TIMEZONE,           // Default for timezone
+    .curPhase = 0,                  // Default for the current phase number
+    .testing = true                 // Default for whether we're in testing mode or not
+};
+
+const byte p[4] = {PV_IN1, PV_IN2, PV_IN3, PV_IN4};
+const byte l[4] = {LS_IN1, LS_IN2, LS_IN3, LS_IN4};
+const byte i[2] = {IL_IN1, IL_IN2};
 
 /****
  * Global variables
  ****/
-const config_t defaultConfig {      // Default configuration data
-    .signature = SIGNATURE,         // How we guess whether this is our config data
-    .ssid = "Set the SSID",         // Place holder for SSID
-    .pw = "Set the PW",             // Place holder for Password
-    .timezone = TIMEZONE,           // Default for timezone
-    .jog = {0, 0, 0, 0},            // Default home position Hall-effect sensor offsets
-    .dark = ILL_DEFAULT_DARK,       // Default dark boundary value
-    .bright = ILL_DEFAULT_BRIGHT    // Default bight boundary 
-};
-
-config_t config;                // Where we hold our configuration data
-
-byte displayPins[4][5] =  {     // The GPIO pins the display is connected to
-    {MINUTE_IN1, MINUTE_IN2, MINUTE_IN3, MINUTE_IN4, MINUTE_HOME}, 
-    {MINUTE10_IN1, MINUTE10_IN2, MINUTE10_IN3, MINUTE10_IN4, MINUTE10_HOME},
-    {HOUR_IN1, HOUR_IN2, HOUR_IN3, HOUR_IN4, HOUR_HOME},
-    {HOUR10_IN1, HOUR10_IN2, HOUR10_IN3, HOUR10_IN4, HOUR10_HOME}
-};
-SSDisplay display {displayPins};// The steppers controlling the digit displays
-
-CommandLine ui;                 // The commandline interpreter
-
-Illuminate illuminate {LIGHT_SENSE, LIGHT_CONTROL};
-
-bool haveSavedConfig;           // True if we have a saved config
-bool wifiIsUp;                  // True if we got connected to Wifi
-bool clockIsSet;                // True if we managed to get the system clock set via WiFi, Internet and NTP
-bool testMode;                  // Set test command; stops clock from changing if it would otherwise do so.
+MoonDisplay display(p, l, i);                           // The moon phase display
+CommandLine ui;                                         // Command line interpreter object
+nvState_t state;                                        // Non-volatile (EEPROM) state
+unsigned long nextPhaseChangeMillis;                    // millis() at next phase change
+boolean eStop;                                          // True if emergency stop needed, false otherwise
+bool haveSavedState;                                    // True if we have a saved state
+bool wifiIsUp;                                          // True if we got connected to Wifi
+bool clockIsSet;                                        // True if we managed to get the system clock set via WiFi, Internet and NTP
 
 /**
- * @brief Dump the contents of config structure to Serial (for debugging)
+ * @brief   Returns true if a comes "before" b in modulo arithmetic. Basically, if it's shorter to
+ *          go "forward" from a to b than it is to go "backward" from a to b.
  * 
+ * @param a
+ * @param b 
+ * @return  true    a comes before b
+ * @return  false   a does not come before b
  */
-void dumpConfig() {
-    if (config.signature != SIGNATURE) {
-        Serial.println("Invalid config:");
-        char* b = (char *)&config;
-        for (int i = 0; i < sizeof(config); i++) {
-            Serial.printf("%02x%c", *(b + i), i % 32 == 31 ? '\n' : ' ');
-        }
-        Serial.print("\n");
-        return;
-    }
-    Serial.println("Valid config:");
-    Serial.printf(".signature: 0x%02x\n"
-                  ".ssid:      %s\n"
-                  ".pw:        %s\n"
-                  ".timezone:  %s\n",
-                  config.signature, config.ssid, config.pw, config.timezone);
+inline bool isBefore(unsigned long a, unsigned long b) {
+    return (a - b) > (b - a);
 }
 
+/**
+ * @brief   Return the "moon age" in seconds at the specified time, t. I.e., the number of seconds 
+ *          that have passed since the new moon previous to t
+ * 
+ * @param t         The time_t for which the moon age is required
+ * @return int32_t  The age of the moon in seconds at t
+ */
+int32_t moonAgeSecsAt(time_t t) {
+    uint32_t secSinceFirstNewMoon = static_cast<uint32_t>(difftime(t, firstNewMoon));
+    // The number of seconds since the last new moon is mod(secSinceFirstNewMoon, <lunar month length in secs>)
+    return static_cast<int32_t>(secSinceFirstNewMoon % static_cast<int32_t>(LUNAR_MONTH * 86400));
+}
+
+/**
+ * @brief Get the phase (0-59) of the moon at the specifed time.
+ * 
+ * NB:  The specified time must be on or after firstNewMoon (22:57UTC on JUly 5, 2024).
+ * 
+ * @param t         time_t time for which the phase is required
+ * @return int16_t  The phase (0-59) at the specified time
+ */
+int16_t moonPhaseAt(time_t t) {
+    // The required phase is 60 * <moon age in sec> / <length of the lunar month in sec> ('cause we're using 60 phases/lunation)
+    return static_cast<int16_t>(moonAgeSecsAt(t) / static_cast<int32_t>(LUNAR_MONTH * 1440.0));
+}
+
+unsigned long getNextPhaseChangeMillis() {
+    time_t now = time(nullptr);
+    int32_t millisSincePhaseChange = (moonAgeSecsAt(now) * 1000) - (moonPhaseAt(now) * PHASE_MILLIS);
+    int32_t nextPhaseChangeMillisFromNow = PHASE_MILLIS - millisSincePhaseChange;
+    return millis() + nextPhaseChangeMillisFromNow;
+}
+
+/**
+ * @brief Connect to the WiFi network using state.ssid for the SSID and state.pw for the password
+ * 
+ * @return true     Success
+ * @return false    Failure
+ */
 bool connectToWifi() {
     int8_t retryCount = 0;
     while (WiFi.status() != WL_CONNECTED && retryCount < WIFI_CONN_MAX_RETRY) {
-        WiFi.begin(config.ssid, config.pw);
+        WiFi.begin(state.ssid, state.pw);
         if (WiFi.status() != WL_CONNECTED) {
             if (++retryCount >= WIFI_CONN_MAX_RETRY) {
                 return false;   // Give up on connecting to WiFi
@@ -188,12 +263,12 @@ bool connectToWifi() {
  */
 bool setSysTimeFromNTP() {
     time_t now;
-    setenv("TZ", config.timezone, 1);               // Do POSIX ritual to make local time be our time zone
+    setenv("TZ", state.timezone, 1);               // Do POSIX ritual to make local time be our time zone
     tzset();
     NTP.begin("pool.ntp.org", "time.nist.gov");     // Set system clock with current epoch using NTP
     int8_t retryCount = 0;
     while ((now = time(nullptr)) < dawnOfHistory && ++retryCount < NTP_MAX_RETRY) {
-        delay(PAUSE_MS);
+        delay(PAUSE_MILLIS);
     }
     if (retryCount >= NTP_MAX_RETRY) {
         return false;
@@ -202,143 +277,109 @@ bool setSysTimeFromNTP() {
 }
 
 /**
- * @brief   'help' and 'h' command handler: Display help text.
+ * @brief Get the status of the device as a String
  * 
- * @param h         The command handler helper we use to access what the user typed
- * @return String   The result to be displayed to the user
+ * @return String   The device status
  */
-String onHelp(CommandHandlerHelper* h) {
-    return 
-        BANNER "help\n"
-        "help               Display this command summary.\n"
-        "h                  Same as 'help'.\n"
-        "ambient [dark day] Set or display the ambient light boundaries between dark <-> lamp and lamp <-> day\n"
-        "                     Where 0 <= dark <= day <= 100. Save to make persistent.\n"
-        "assume <m> <n>     Assume that module <m> is showing digit <n>.\n"
-        "count [<m>]        On module <m>, display the digits 0..9 slowly one after another.\n"
-        "                     Modules are numbered 0 .. 3 from left to right.\n"
-        "home <m>           Move module <m> to its home position, displaying 0.\n"
-        "jog <m> [<steps>]  Jog module <m> by <steps>, 0 <= m <= 3, -2047 <= <steps> <= 2047.\n"
-        "                     If <steps> is 0 or omitted, display current jog for module <m>.\n"
-        "                     Save to make persistent.\n"
-        "save               Save the current configuration data in persistent memory.\n"
-        "                     Until a save is done, configuration changes are not made persistent.\n"
-        "show <m> <n>       Make module <m> show digit <n>, 0 <= m <= 3, 0 <= n <= 9.\n"
-        "status             Display the system status.\n"
-        "style [12 | 24]    Set or display the style of the display, 12-hour or 24-hour\n"
-        "                     Save to make persistent.\n"
-        "test [on | off]    Turn test mode on or off or say whether test is on\n"
-        "tz [<POSIX tz>]    Set or display the POSIX-format timeszone to use.\n"
-        "                     Save to make persistent.\n"
-        "wifi pw <password> Set the WiFi password to <password>.\n"
-        "                     Save to make persistent.\n"
-        "wifi ssid <ssid>   Set the WiFi SSID we should use to <ssid>\n"
-        "                     Save to make persistent.\n";
+String getStatus() {
+    String answer = 
+        String("WiFi is ") + (wifiIsUp ? "" : "not" ) + "connected, system clock is " + (clockIsSet ? "" : "not ") + 
+        "set, test is " + (state.testing ? "on.\n" : "off.\n");
+    if (clockIsSet) {
+        time_t now = time(nullptr);
+        tm *nowTm = gmtime(&now);
+        int32_t secToPC = (nextPhaseChangeMillis - millis()) / 1000;
+        String hourPC = String(secToPC / 3600);
+        String minPC = String((secToPC % 3600) / 60);
+        String secPC = String(secToPC % 60);
+        answer += 
+            "At " + String(nowTm->tm_hour) + ":" + (nowTm->tm_min < 10 ? "0" : "") + 
+            String(nowTm->tm_min) + ":" + (nowTm->tm_sec < 10 ? "0" : "") + String(nowTm->tm_sec) + " UTC displayed moon phase is " + 
+            String(display.getPhase()) + ", actual moon phase is " + String(moonPhaseAt(now)) + ", next phase change is in " + 
+            hourPC + ":" + (minPC.length() < 2 ? "0" : "") + minPC + ":" + (secPC.length() < 2 ? "0" : "") + secPC + ".\n";
+    } else {
+        answer += "Displayed moon phase is " + String(display.getPhase()) + ".\n";
+    }
+    return answer;
 }
 
 /**
- * @brief   'ambient [dark day]" command handler: Set or display the ambient light boundaries 
- *          between dark<->>lamp and lamp<->day. Where 0.0 <= dark <= day <= 1.0
+ * @brief help command handler: Display command summary
  * 
- * @param h         The command handler helper we use to access what the user typed
- * @return String   The result to be displayed to the user
+ * @param h         Pointer to CommandHandlerHelper object
+ * @return String   The String to dsiplay
  */
-String onAmbient(CommandHandlerHelper* h) {
-    float darkToLamps = h->getWord(1).toFloat();
-    float lampsToDay = h->getWord(2).toFloat();
-    if (darkToLamps == 0.0 && lampsToDay == 0.0) {
-        return String("Dark-to-lamps: ") + String(100.0 * illuminate.getDarkToLamps()) + 
-          "%, lamps-to-day: " + String(100.0 * illuminate.getLampsToDay()) + "%.\n";
-    }
-    if (illuminate.setAmbientBounds(darkToLamps / 100.0, lampsToDay / 100.0)) {
-        config.dark = darkToLamps / 100.0;
-        config.bright = lampsToDay / 100.0;
-        return String("Dark-to-lamps boundary set to ") + String(darkToLamps) + 
-          "%, lamps-to-day boundary set to " + String(lampsToDay) + "%.\n";
-    }
-    return "Can't set those boundaries. Must be 0.0% <= dark-to-lamps <= lamps-to-day <= 100.0%.\n";
+String onHelp(CommandHandlerHelper *h) {
+    return
+        "help                   Display this text to the user\n"
+        "h                      Same as \"help\"\n"
+        "assume <phase>         Assume display is showing phase <phase>\n"
+        "ls [<steps>]           Drive leadscrew by <steps>. + ==> out, - ==> in\n"
+        "pv [<steps>]           Drive pivot by <steps>. + ==> CC, - ==> CW viewed from front\n"
+        "save                   Save the current configuration data in persistent memory.\n"
+        "                       Until a save is done or the phase of the moon changes,\n"
+        "                       configuration changes are not made persistent.\n"
+        "show <phase>           Change display to show phase <phase>\n"
+        "status                 Report on the system's status.\n"
+        "stop                   Stop all motion immediately\n"
+        "s                      Same as \"stop\"\n"
+        "test [on|off]          Set or print whether we're in test mode\n"
+        "tz [<POSIX tz>]        Set or display the POSIX-format timeszone to use.\n"
+        "                       Save to make persistent.\n"
+        "wifi pw <password>     Set the WiFi password to <password>.\n"
+        "                       Save to make persistent.\n"
+        "wifi ssid <ssid>       Set the WiFi SSID we should use to <ssid>\n"
+        "                       Save to make persistent.\n";
 }
 
 /**
- * @brief   'assume <m> <n>' command handler: Assume that the display module m is showing the 
- *          digit <n>
+ * @brief   assume <phase> command handler: Assume display is showing phase <phase> and that's 
+ *          where we are and want to be.
  * 
- * @param h         The command handler helper we use to access what the user typed
- * @return String   The result to be displayed to the user
+ * @param h         CommandLineHelper to talk to command processor
+ * @return String   What command processor should show to the user
  */
-String onAssume(CommandHandlerHelper* h) {
-    int16_t m = h->getWord(1).toInt();
-    int16_t n = h->getWord(2).toInt();
-    if (m < 0 || m >= SSD_N_MODULES || n < 0 || n > 9) {
-        return "Assume needs a module number in the range 0 .. 3 and a digit in the range 0 .. 9.\n";
+String onAssume(CommandHandlerHelper *h) {
+    int16_t phase = h->getWord(1).toInt();
+    if (phase < 0 || phase >= 60) {
+        return "Phase must be 0 .. 59\n";
     }
-    display.assume(m, n);
-    return String("Assuming digit ") + String(m) + " shows " + String(n) + ".\n";
+    state.curPhase = phase;
+    display.assume(phase);
+    EEPROM.put(CONFIG_ADDR, state);
+    return String("Assumed display shows phase ") + String(phase) + String(EEPROM.commit() ? " and saved\n" : " but unable to save.\n");
 }
 
 /**
- * @brief   'count [<m>] command handler: On module <m>, display the digits 0..9 slowly one after 
- *          another. Modules are numbered 3 .. 0 from left to right. I.e., module 0 is minutes.
+ * @brief   ls command handler: Drive leadscrew by <steps>. + ==> out, - ==> in,
+ *          but don't change thes location the motor thinks it's at
  * 
- * @param h         The command handler helper we use to access what the user typed
- * @return String   The result to be displayed to the user
+ * @param h         CommandLineHelper to talk to command processor
+ * @return String   What command processor should show to the user
  */
-String onCount(CommandHandlerHelper* h) {
-    int16_t m = h->getWord(1).toInt();
-    if (m < 0 || m >= SSD_N_MODULES) {
-        return "Module number must be in the range 0..3\n";
+String onLs(CommandHandlerHelper *h) {
+    int32_t steps = h->getWord(1).toInt();
+    if (steps == 0) {
+        return "Leadscrew position: " + String(display.getLs()) + " steps.\n";
     }
-    int16_t curVal = display.getVal(m);
-    for (int16_t d = 1; d <= 10; d++) {
-        display.setVal(m, (curVal + d) % 10);
-        delay(COUNT_PAUSE_MS);
-    }
-    return "";
+    display.turnLs(steps);
+    return String("Driving leadscrew by ") + String(steps) + ".\n";
 }
 
 /**
- * @brief   'home <m> command handler: Move module <m> to its sensor based home position
- *          (which for convenience of construction turns out to be "5").
+ * @brief   pv command handler: Drive pivot by <steps>. + ==> CC, - ==> CW viewed from front, 
+ *          but don't change the location the motor thinks it's at.
  * 
- * @param h         The command handler helper we use to access what the user typed
- * @return String   The result to be displayed to the user
+ * @param h         CommandLineHelper to talk to command processor
+ * @return String   What command processor should show to the user
  */
-String onHome(CommandHandlerHelper* h) {
-    int16_t m = h->getWord(1).toInt();
-    if (m < 0 || m >= SSD_N_MODULES) {
-        return "Command 'home' needs a module number, 0 .. 3\n";
+String onPv(CommandHandlerHelper *h) {
+    int32_t steps = h->getWord(1).toInt();
+    if (steps == 0) {
+        return "Pivot position: " + String(display.getPv()) + " steps.\n";
     }
-    display.home(m);
-    display.jog(m, config.jog[m]);
-    return "";
-}
-
-/**
- * @brief   'jog <m> [<steps>]' command handler: Jog module <m> by <steps>, 0 <= m <= 3, 
- *          -2047 <= <steps> <= 2047. Used to fine tune display of digits. If <steps> is 0
- *          or omitted, display currrent jog value for module <m>.
- * 
- * @details The net of all the jog commands issued is saved in config and is used during 
- *          initialization to fine tune each digit's display.
- * 
- * @param h         The command handler helper we use to access what the user typed
- * @return String   The result to be displayed to the user
- */
-String onJog(CommandHandlerHelper* h) {
-    int16_t m = h->getWord(1).toInt();
-    if (m < 0 || m > 3) {
-        return "Module number out of range. Must be 0..3\n";
-    }
-    int16_t n = h->getWord(2).toInt();
-    if (n < -2047 || n > 2047) {
-        return "Step value out of range. Must be -2047..2047\n";
-    }
-    if (n == 0) {
-        return String("Jog for module ") + String(m) + " is " + String(config.jog[m]) + ".\n";
-    }
-    config.jog[m] += n;
-    display.jog(m, n);
-    return "";
+    display.turnPv(steps);
+    return String("Driving pivot by ") + String(steps) + ".\n";
 }
 
 /**
@@ -348,96 +389,64 @@ String onJog(CommandHandlerHelper* h) {
  * @return String   The result to be displayed to the user
  */
 String onSave(CommandHandlerHelper* h) {
-    EEPROM.put(CONFIG_ADDR, config);
+    EEPROM.put(CONFIG_ADDR, state);
     return (EEPROM.commit() ? "Configuration saved\n" : "Configuration save failed.\n");
 }
 
 /**
- * @brief   'show <m> <n>' command handler: Make module <m> show digit <n>, 0 <= m <= 3, 0 <= n <= 9
+ * @brief show <phase> command handler: Change display to show phase <phase>
  * 
- * @param h         The command handler helper we use to access what the user typed
- * @return String   The result to be displayed to the user
+ * @param h         CommandLineHelper to talk to command processor
+ * @return String   What command processor should show to the user
  */
-String onShow(CommandHandlerHelper* h) {
-    int16_t m = h->getWord(1).toInt();
-    if (m < 0 || m > 3) {
-        return "Module number out of range. Must be 0..3\n";
+String onShow(CommandHandlerHelper *h) {
+    int16_t phase = h->getWord(1).toInt();
+    if (phase < 0 || phase >= 60) {
+        return "Phase to show must be 0 .. 59.\n";
     }
-    int16_t n = h->getWord(2).toInt();
-    if (n < 0 || n > 9) {
-        return "Digit value to be displayed must be in the range 0..9\n";
-    }
-    display.setVal(m, n);
-    return "";
+    display.showPhase(phase);
+    return String("Changing to show phase ") + String(phase) + ".\n";
 }
 
 /**
- * @brief   'status' command handler: Display the current status of the system
+ * @brief status command handler: Report on the system's status
  * 
- * @param h         The command handler helper we use to access what the user typed
- * @return String   The result to be displayed to the user
+ * @param h         CommandLineHelper to talk to command processor
+ * @return String   What command processor should show to the user
  */
-String onStatus(CommandHandlerHelper* h) {
-    String answer = BANNER " status\n";
-    if (testMode) {
-        answer += "Display is in test mode.\n";
-    }
-    if (wifiIsUp) {
-        answer += "Connected to '" + String(config.ssid) + "'\n";
-    }
-    if (clockIsSet) {
-        time_t curTime = time(nullptr);
-        struct tm *t;
-        t = localtime(&curTime);
-        answer += "It's currently " + String(t->tm_hour) + ":" + (t->tm_min < 10 ? "0" : "") + String(t->tm_min) + "\n";
-    } else {
-        answer += "The system clock is not set.\n";
-    }
-    answer += "Display is currently showing: " + display.toString();
-    return answer + "\n";
-}
-
-String onStyle(CommandHandlerHelper* h) {
-    String answer = "Display mode set to ";
-    switch (h->getWord(1).toInt()) {
-        case 0:
-            answer = "The display mode is ";
-            answer += String(display.styleIs24() ? "24-hour\n" : "12-hour\n");
-            break;
-        case 12:
-            display.setStyle24(false);
-            config.style24 = false;
-            answer += "12-hour\n";
-            break;
-        case 24:
-            display.setStyle24(true);
-            config.style24 = true;
-            answer += "24-hour\n";
-            break;
-        default:
-            answer = "The style must be 12, 24, or ommited (to show the current style setting)\n";
-    }
-    return answer;
+String onStatus(CommandHandlerHelper *h) {
+    return getStatus();
 }
 
 /**
- * @brief   'test [on | off]' command handler: Turn test mode on or off or say whether test is on
+ * @brief stop and s command handler: Put us in an emergency stop state
  * 
- * @param h         The command handler helper we use to access what the user typed
- * @return String   The result to be displayed to the user
+ * @param h         CommandLineHelper to talk to command processor
+ * @return String   What command processor should show to the user
  */
-String onTest(CommandHandlerHelper* h) {
-    String parm = h->getWord(1);
-    if (parm.length() == 0) {
-        return String("Test is ") + (testMode ? "on.\n" : "off.\n");
-    } else if (parm.equalsIgnoreCase("on")) {
-        testMode = true;
-    } else if (parm.equalsIgnoreCase("off")) {
-        testMode = false;
+String onStop(CommandHandlerHelper *h) {
+    display.stop();
+    return "Stopping.\n";
+}
+
+/**
+ * @brief test on|off command handler: Turn test mode on or off
+ * 
+ * @param h         CommandLineHelper to talk to command processor
+ * @return String   What command processor should show to the user
+ */
+String onTest(CommandHandlerHelper *h) {
+    if(h->getWord(1).equalsIgnoreCase("on")) {
+        state.testing = true;
+        return "Test mode on\n";
+        digitalWrite(LED, LOW); // The watchdog doesn't blink in test mode, so, in case it's on...
+    } else if (h->getWord(1).equalsIgnoreCase("off")) {
+        state.testing = false;
+        nextPhaseChangeMillis = millis();
+        return "Test mode off\n";
     } else {
-        return String("Test command doesn't know '") + parm + "'.\n";
+        return String("Test mode is currently ") + (state.testing ? "on\n" : "off\n");
     }
-    return "";
 }
 
 /**
@@ -449,13 +458,13 @@ String onTest(CommandHandlerHelper* h) {
 String onTz(CommandHandlerHelper* h) {
     String target = h->getWord(1);
     if (target.length() == 0) {
-        return "Timezone is: '" + String(config.timezone) + "'.\n";
+        return String("Timezone is: '") + String(state.timezone) + "'.\n";
     }
-    if (target.length() > sizeof(config.timezone) - 1) {
-        return "timezone string must be less than " + String(sizeof(config.timezone)) + " characters.\n";
+    if (target.length() > sizeof(state.timezone) - 1) {
+        return String("timezone string must be less than ") + String(sizeof(state.timezone)) + String(" characters.\n");
     }
-    strcpy(config.timezone, target.c_str());
-    return "Timezone set to '" + target + "'.\n";
+    strcpy(state.timezone, target.c_str());
+    return String("Timezone set to '") + target + "'.\n";
 }
 
 /**
@@ -469,36 +478,36 @@ String onWifi(CommandHandlerHelper* h) {
     String subCmd = h->getWord(1);
     subCmd.toLowerCase();
     if (subCmd.length() == 0) {
-        return "Wifi ssid: '" + String(config.ssid) + "'\nWifi pw:   '" + String(config.pw) + "'\n";
+        return String("Wifi ssid: '") + String(state.ssid) + String("'\nWifi pw:   '") + String(state.pw) + "'\n";
     }
     if (!(subCmd.equals("pw") || subCmd.equals("ssid"))) {
-        return "wifi command only knows about 'pw' and 'ssid'.\n";
+        return String("wifi command only knows about 'pw' and 'ssid'.\n");
     }
     String target = h->getCommandLine().substring(subCmd.length());
     target = target.substring(target.indexOf(subCmd) + subCmd.length());
     target.trim();
     if (target.length() <= 0) {
-        return "Can't set the WiFi " + subCmd +  " to nothing at all.\n";
+        return String("Can't set the WiFi ") + subCmd +  String(" to nothing at all.\n");
     }
     if (subCmd.equals("pw")) {
-        if (sizeof(config.pw) < target.length() + 1) {
-            return "Maximum length of a password is " + String(sizeof(config.pw) - 1) + " characters\n";
+        if (sizeof(state.pw) < target.length() + 1) {
+            return String("Maximum length of a password is ") + String(sizeof(state.pw) - 1) + String(" characters\n");
         }
-        strcpy(config.pw, target.c_str());
+        strcpy(state.pw, target.c_str());
     } else {
-        if (sizeof(config.ssid) < target.length() + 1) {
-            return "Maximum length of an ssid is " + String(sizeof(config.pw) - 1) + " characters\n";
+        if (sizeof(state.ssid) < target.length() + 1) {
+            return String("Maximum length of an ssid is ") + String(sizeof(state.pw) - 1) + String(" characters\n");
         }
-        strcpy(config.ssid, target.c_str());
+        strcpy(state.ssid, target.c_str());
     }
-    return "Changed " + subCmd + " to '" + target + "'.\n";
+    return String("Changed ") + subCmd + " to '" + target + "'.\n";
 }
 
+
 void setup() {
-    haveSavedConfig = true;         // Assume we'll succeed in retrieveing the config
+    haveSavedState = true;          // Assume we'll succeed in retrieveing the state
     wifiIsUp = false;               // Assume we'll fail in getting the WiFi up
     clockIsSet = false;             // Assume we'll succeed in setting the system clock from NTP
-    testMode = false;               // Not in testMode initially
 
     // Init builtin LED
     pinMode(LED, OUTPUT);
@@ -508,7 +517,7 @@ void setup() {
     Serial.begin(9600);
     long msStart = millis();
     while (!Serial && millis() - msStart < SERIAL_WAIT_MS) {
-        delay(PAUSE_MS);
+        delay(PAUSE_MILLIS);
         digitalWrite(LED, digitalRead(LED) == HIGH ? LOW : HIGH);
     }
     Serial.println(BANNER);
@@ -516,26 +525,23 @@ void setup() {
 
     // Try to retrieve the configuration
     EEPROM.begin(4096);
-    config = EEPROM.get(CONFIG_ADDR, config);
-    if (config.signature != SIGNATURE) {
-        config = defaultConfig;
-        Serial.println("There's no stored configuration data; won't be able to connect to WiFi.");
-        haveSavedConfig = false;    // Show we we didn't get a saved config
+    state = EEPROM.get(CONFIG_ADDR, state);
+    if (state.fingerprint != FINGERPRINT) {
+        state = defaultState;
+        Serial.println("There's no stored configuration data; we won't be able to connect to WiFi.");
+        haveSavedState = false;
     }
 
     // Initialize the command interpreter
     if (!(
-        ui.attachCmdHandler("help", onHelp) &&
-        ui.attachCmdHandler("h", onHelp) &&
-        ui.attachCmdHandler("ambient", onAmbient) &&
+        ui.attachCmdHandler("help", onHelp) && ui.attachCmdHandler("h", onHelp) &&
         ui.attachCmdHandler("assume", onAssume) &&
-        ui.attachCmdHandler("count", onCount) &&
-        ui.attachCmdHandler("home", onHome) &&
-        ui.attachCmdHandler("jog", onJog) &&
+        ui.attachCmdHandler("ls", onLs) && 
+        ui.attachCmdHandler("pv", onPv) &&
         ui.attachCmdHandler("save", onSave) &&
         ui.attachCmdHandler("show", onShow) &&
         ui.attachCmdHandler("status", onStatus) &&
-        ui.attachCmdHandler("style", onStyle) &&
+        ui.attachCmdHandler("stop", onStop) && ui.attachCmdHandler("s", onStop) &&
         ui.attachCmdHandler("test", onTest) &&
         ui.attachCmdHandler("tz", onTz) &&
         ui.attachCmdHandler("wifi", onWifi)
@@ -544,8 +550,8 @@ void setup() {
     }
 
     // Connect to WiFi if we have a saved config
-    if (haveSavedConfig) {
-        Serial.printf("Attempting to connect to WiFi with ssid '%s'.\n", config.ssid);
+    if (haveSavedState) {
+        Serial.printf(String("Attempting to connect to WiFi with ssid '%s'.\n").c_str(), state.ssid);
         wifiIsUp = connectToWifi();
     }
 
@@ -565,38 +571,60 @@ void setup() {
 
     // Initialize the display
     Serial.println("Initializing the display.");
-    display.begin(config.jog);                          // Get the display going
-    display.setStyle24(config.style24);
-    illuminate.begin();
+    display.begin(state.curPhase);
+    if (clockIsSet) {
+        time_t now = time(nullptr);
+        if (state.testing || state.curPhase == moonPhaseAt(now)) {
+            nextPhaseChangeMillis = getNextPhaseChangeMillis();
+        } else {
+            nextPhaseChangeMillis = millis();
+        }
+    }
 
     // Show we're ready to go
+    Serial.print(getStatus());
     Serial.print("Type 'h' or 'help' for a command summary.\n");
 }
 
 void loop() {
-    static int lastMin = -1;                // Minutes after the hour that we last updated the display
-
-    // Let the command interpreter do its thing
-    ui.run();
-
-    // Update the illuminaton level
-    illuminate.run();
-
-    // If the display is supposed to be showing the time
-    if (clockIsSet && !testMode) {
-        //   Get the current time in struct tm format
-        time_t curTime = time(nullptr);
-        struct tm *curTm;
-        curTm = localtime(&curTime);
-
-        //   Update display if the minute changed
-        if (curTm->tm_min != lastMin) {    
-            if (lastMin == -1) {
-                Serial.printf("Setting the display to the current time: %02d:%02d\n", curTm->tm_hour, curTm->tm_min);
-                ui.cancelCmd();
-            } 
-            display.showTime(curTm->tm_hour, curTm->tm_min);
-            lastMin = curTm->tm_min;
+    static unsigned long nextBlinkMillis = millis() + PAUSE_MILLIS;
+    // If we're actually running, deal with blinking the watchdog LED
+    if (clockIsSet && isBefore(nextBlinkMillis, millis())) {
+        if (!state.testing) {
+            if(digitalRead(LED) == HIGH) {
+                digitalWrite(LED, LOW);
+                nextBlinkMillis += BLINK_OFF_MILLIS;
+            } else {
+                digitalWrite(LED, HIGH);
+                nextBlinkMillis += BLINK_ON_MILLIS;
+            }
+        } else {
+            nextBlinkMillis += BLINK_OFF_MILLIS;
         }
+    }
+     // Let the ui and the display do their thing
+    ui.run();
+    int16_t newPhase = display.run();
+    if (newPhase != -1) {
+        state.curPhase = newPhase;
+        EEPROM.put(CONFIG_ADDR, state);
+        if(!EEPROM.commit()) {
+            Serial.println("Moved to new phase, but unable to save!");
+        }
+    }
+
+    // If the time for a new phase has arrived, deal with it
+    if (clockIsSet && isBefore(nextPhaseChangeMillis, millis())) {
+        // if we're not testing, actually move the display
+        if (!state.testing ) {
+            time_t now = time(nullptr);
+            int16_t phase = moonPhaseAt(now);
+            // If something's already underway, we went off the rails somehow. Stop the world, it's time to get off!
+            if (!display.showPhase(phase)) {
+                Serial.println("Time for phase change, but things aren't all quiet. Stopping.");
+                display.stop();
+            }
+        }
+        nextPhaseChangeMillis = getNextPhaseChangeMillis();
     }
 }
