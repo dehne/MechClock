@@ -53,7 +53,11 @@
       },
       "diff_pair_dimensions": [],
       "drc_exclusions": [
-        "unconnected_items|124460000|93980000|a965b281-8e72-4c72-a912-d266e3efb0dd|f34292ac-1eae-4e83-93c2-302edaff1306"
+        "unconnected_items|124460000|68580000|da5b4e00-be6f-4bee-8fae-0d9aaf95b650|b691a4c9-80c2-4a10-8222-67f452ff5963",
+        "unconnected_items|124460000|81280000|b691a4c9-80c2-4a10-8222-67f452ff5963|a965b281-8e72-4c72-a912-d266e3efb0dd",
+        "unconnected_items|124460000|93980000|a965b281-8e72-4c72-a912-d266e3efb0dd|85dc12aa-5696-486f-b9d3-2cd31e2e6e7f",
+        "unconnected_items|124460000|93980000|a965b281-8e72-4c72-a912-d266e3efb0dd|f34292ac-1eae-4e83-93c2-302edaff1306",
+        "unconnected_items|142240000|68580000|9f3d3a28-0386-40f5-837a-8712e5459f66|da5b4e00-be6f-4bee-8fae-0d9aaf95b650"
       ],
       "meta": {
         "version": 2
@@ -75,6 +79,7 @@
         "footprint_type_mismatch": "ignore",
         "hole_clearance": "error",
         "hole_near_hole": "error",
+        "holes_co_located": "warning",
         "invalid_outline": "error",
         "isolated_copper": "warning",
         "item_on_disabled_layer": "error",
@@ -467,17 +472,18 @@
       "gencad": "",
       "idf": "",
       "netlist": "",
-      "plot": "",
+      "plot": "production/",
       "pos_files": "",
       "specctra_dsn": "",
       "step": "",
-      "svg": "",
+      "svg": "C:/Users/David/Downloads/",
       "vrml": ""
     },
     "page_layout_descr_file": ""
   },
   "schematic": {
     "annotate_start_num": 0,
+    "bom_export_filename": "",
     "bom_fmt_presets": [],
     "bom_fmt_settings": {
       "field_delimiter": ",",

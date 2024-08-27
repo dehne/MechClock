@@ -295,7 +295,7 @@ String getStatus() {
         answer += 
             "At " + String(nowTm->tm_hour) + ":" + (nowTm->tm_min < 10 ? "0" : "") + 
             String(nowTm->tm_min) + ":" + (nowTm->tm_sec < 10 ? "0" : "") + String(nowTm->tm_sec) + " UTC displayed moon phase is " + 
-            String(display.getPhase()) + ", actual moon phase is " + String(moonPhaseAt(now)) + ", next phase change is in " + 
+            String(display.getPhase()) + "/60, actual moon phase is " + String(moonPhaseAt(now)) + "/60, next phase change is in " + 
             hourPC + ":" + (minPC.length() < 2 ? "0" : "") + minPC + ":" + (secPC.length() < 2 ? "0" : "") + secPC + ".\n";
     } else {
         answer += "Displayed moon phase is " + String(display.getPhase()) + ".\n";

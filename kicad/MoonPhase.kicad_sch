@@ -7,7 +7,7 @@
 	(title_block
 		(title "Moon Phase Display")
 		(date "2024-06-25")
-		(rev "A")
+		(rev "B")
 	)
 	(lib_symbols
 		(symbol "Connector:Conn_01x03_Socket"
@@ -493,6 +493,164 @@
 						)
 					)
 					(number "5"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+		)
+		(symbol "Device:C_Polarized"
+			(pin_numbers hide)
+			(pin_names
+				(offset 0.254)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "C"
+				(at 0.635 2.54 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Value" "C_Polarized"
+				(at 0.635 -2.54 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left)
+				)
+			)
+			(property "Footprint" ""
+				(at 0.9652 -3.81 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" "~"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" "Polarized capacitor"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_keywords" "cap capacitor"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "ki_fp_filters" "CP_*"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(symbol "C_Polarized_0_1"
+				(rectangle
+					(start -2.286 0.508)
+					(end 2.286 1.016)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.778 2.286) (xy -0.762 2.286)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.27 2.794) (xy -1.27 1.778)
+					)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(rectangle
+					(start 2.286 -0.508)
+					(end -2.286 -1.016)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+			)
+			(symbol "C_Polarized_1_1"
+				(pin passive line
+					(at 0 3.81 270)
+					(length 2.794)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at 0 -3.81 90)
+					(length 2.794)
+					(name "~"
+						(effects
+							(font
+								(size 1.27 1.27)
+							)
+						)
+					)
+					(number "2"
 						(effects
 							(font
 								(size 1.27 1.27)
@@ -2531,20 +2689,12 @@
 		(uuid "4d2a55a8-7882-4cbb-a186-73ca8db22f0a")
 	)
 	(no_connect
-		(at 167.64 81.28)
-		(uuid "5a7594d9-0581-4687-803d-3be90d2f64aa")
-	)
-	(no_connect
 		(at 50.8 95.25)
 		(uuid "6fa19f25-a1e6-4fdf-a433-e5949dd9de60")
 	)
 	(no_connect
 		(at 50.8 82.55)
 		(uuid "6ffc5652-46e0-4019-9a6e-00b6fd0c37b2")
-	)
-	(no_connect
-		(at 147.32 81.28)
-		(uuid "8225a5a1-61c6-4255-ad92-4f965ccc07cb")
 	)
 	(no_connect
 		(at 50.8 74.93)
@@ -2599,14 +2749,6 @@
 		(uuid "cb11277c-d9b0-48f9-9dbc-05ec0da1fbf8")
 	)
 	(no_connect
-		(at 167.64 83.82)
-		(uuid "f2852744-fefc-4590-89d7-9045f5cdaaea")
-	)
-	(no_connect
-		(at 147.32 83.82)
-		(uuid "f4738430-c001-43f1-baa5-ef34dca6cd1b")
-	)
-	(no_connect
 		(at 96.52 74.93)
 		(uuid "f7799229-a108-4eb0-96da-8430b7238e8d")
 	)
@@ -2632,28 +2774,6 @@
 			)
 		)
 	)
-	(global_label "IL_IN_1"
-		(shape input)
-		(at 148.59 119.38 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "107fe940-5bc5-47a1-acd9-8fb2eaef8651")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 138.8919 119.38 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-				(hide yes)
-			)
-		)
-	)
 	(global_label "LS_OUT_1"
 		(shape input)
 		(at 204.47 101.6 180)
@@ -2667,6 +2787,50 @@
 		(uuid "191fa179-950b-4087-854e-502556901b36")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 192.4739 101.6 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "IL_IN_2"
+		(shape input)
+		(at 148.59 119.38 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "193d4681-656e-4bd0-8eb7-6961eec09a0e")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 138.8919 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "IL_IN_2"
+		(shape input)
+		(at 148.59 121.92 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "1b8ffa24-d5ea-45e3-a496-6f7d95c141c8")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 138.8919 121.92 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -2896,6 +3060,28 @@
 			)
 		)
 	)
+	(global_label "IL_OUT_1"
+		(shape input)
+		(at 203.2 135.89 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "3c2e62c9-5af3-42e3-911c-feba17d08d47")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 191.8086 135.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
 	(global_label "PV_IN_4"
 		(shape input)
 		(at 147.32 76.2 180)
@@ -2980,6 +3166,28 @@
 					(size 1.27 1.27)
 				)
 				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "IL_OUT_2"
+		(shape input)
+		(at 168.91 119.38 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "49e286d2-946e-4d59-8f15-2c9763032582")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 180.3014 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
 				(hide yes)
 			)
 		)
@@ -3094,28 +3302,6 @@
 			)
 		)
 	)
-	(global_label "IL_OUT_2"
-		(shape input)
-		(at 168.91 121.92 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "6577442b-b24e-481c-b3e3-f1edaec40077")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 180.3014 121.92 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-				(hide yes)
-			)
-		)
-	)
 	(global_label "PV_IN_3"
 		(shape input)
 		(at 147.32 73.66 180)
@@ -3195,6 +3381,28 @@
 		(uuid "721a72a9-425a-4259-86ed-6510738be556")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 138.2872 116.84 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "IL_IN_1"
+		(shape input)
+		(at 147.32 83.82 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "80377092-da9d-451a-82bd-883ae10ef458")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 137.6219 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3292,6 +3500,28 @@
 			)
 		)
 	)
+	(global_label "IL_OUT_2"
+		(shape input)
+		(at 203.2 142.24 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "9ac21b76-725d-43f6-acbe-96f67c9204fc")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 191.8086 142.24 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
 	(global_label "LS_IN_3"
 		(shape input)
 		(at 96.52 97.79 0)
@@ -3358,6 +3588,28 @@
 			)
 		)
 	)
+	(global_label "IL_OUT_1"
+		(shape input)
+		(at 167.64 81.28 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "bd8d33f8-d188-4a36-bda8-bbdff6d3f602")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 179.0314 81.28 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+	)
 	(global_label "PV_OUT_1"
 		(shape input)
 		(at 203.2 49.53 180)
@@ -3415,28 +3667,6 @@
 		(uuid "c37f2c34-78f0-4751-ae0d-366ea4fe506d")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 193.0786 121.92 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-				(hide yes)
-			)
-		)
-	)
-	(global_label "IL_IN_2"
-		(shape input)
-		(at 148.59 121.92 180)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right)
-		)
-		(uuid "c9e8d587-14c2-4098-bd8e-de6c5fe36b1d")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 138.8919 121.92 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3512,6 +3742,28 @@
 			)
 		)
 	)
+	(global_label "IL_OUT_2"
+		(shape input)
+		(at 168.91 121.92 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "e0539f7f-fc86-46ca-8dbc-6e98135211d1")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 180.3014 121.92 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+	)
 	(global_label "LS_IN_1"
 		(shape input)
 		(at 96.52 102.87 0)
@@ -3556,9 +3808,31 @@
 			)
 		)
 	)
+	(global_label "IL_IN_1"
+		(shape input)
+		(at 147.32 81.28 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "eb5c80e1-23e0-47ed-aa75-7fdaae678830")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 137.6219 81.28 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+				(hide yes)
+			)
+		)
+	)
 	(global_label "IL_OUT_1"
 		(shape input)
-		(at 168.91 119.38 0)
+		(at 167.64 83.82 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -3566,9 +3840,9 @@
 			)
 			(justify left)
 		)
-		(uuid "f1246cc7-55ab-4e8c-84f8-6ba1b0234aa3")
+		(uuid "f4251a2c-5c6f-4a2c-8930-c1a43104a5b8")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 180.3014 119.38 0)
+			(at 179.0314 83.82 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -3801,6 +4075,73 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+5V")
+		(at 210.82 135.89 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "0e007235-c94d-45e3-a552-70e62c7694fb")
+		(property "Reference" "#PWR013"
+			(at 207.01 135.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+5V"
+			(at 214.63 135.8899 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 210.82 135.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 210.82 135.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+5V\""
+			(at 210.82 135.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "10d8988d-10f5-4de8-8f36-c4e2746d02fb")
+		)
+		(instances
+			(project "MoonPhase"
+				(path "/5cb35ecb-29a2-4f40-9211-172c9f7696cb"
+					(reference "#PWR013")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Transistor_Array:ULN2003A")
 		(at 157.48 73.66 0)
 		(unit 1)
@@ -3906,6 +4247,73 @@
 			(project "MoonPhase"
 				(path "/5cb35ecb-29a2-4f40-9211-172c9f7696cb"
 					(reference "U1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C_Polarized")
+		(at 207.01 135.89 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "2632d207-f7da-4c77-809f-79b4420ed2c4")
+		(property "Reference" "C1"
+			(at 207.01 131.064 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "22uF 16v"
+			(at 198.374 133.604 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Capacitor_THT:CP_Radial_D4.0mm_P2.00mm"
+			(at 203.2 136.8552 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 207.01 135.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Polarized capacitor"
+			(at 207.01 135.89 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "fd827c82-896c-40a0-8ede-f4cd9a738a1b")
+		)
+		(pin "2"
+			(uuid "76c53c27-b46f-4b42-b2a8-c91b2b037d44")
+		)
+		(instances
+			(project ""
+				(path "/5cb35ecb-29a2-4f40-9211-172c9f7696cb"
+					(reference "C1")
 					(unit 1)
 				)
 			)
@@ -4382,6 +4790,73 @@
 			(project "MoonPhase"
 				(path "/5cb35ecb-29a2-4f40-9211-172c9f7696cb"
 					(reference "U3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:C_Polarized")
+		(at 207.01 142.24 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "4ac7f80e-c7d1-4f66-a2f3-10b480e5d730")
+		(property "Reference" "C2"
+			(at 207.01 147.574 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "22uF 16v"
+			(at 198.882 145.034 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Capacitor_THT:CP_Radial_D4.0mm_P2.00mm"
+			(at 203.2 143.2052 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 207.01 142.24 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Polarized capacitor"
+			(at 207.01 142.24 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "fd827c82-896c-40a0-8ede-f4cd9a738a1b")
+		)
+		(pin "2"
+			(uuid "76c53c27-b46f-4b42-b2a8-c91b2b037d44")
+		)
+		(instances
+			(project ""
+				(path "/5cb35ecb-29a2-4f40-9211-172c9f7696cb"
+					(reference "C2")
 					(unit 1)
 				)
 			)
@@ -5461,6 +5936,73 @@
 			(project "MoonPhase"
 				(path "/5cb35ecb-29a2-4f40-9211-172c9f7696cb"
 					(reference "#PWR08")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+5V")
+		(at 210.82 142.24 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "fcbfe599-4bf4-4499-95f6-278ba319d5bc")
+		(property "Reference" "#PWR014"
+			(at 207.01 142.24 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "+5V"
+			(at 214.63 142.2399 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 210.82 142.24 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 210.82 142.24 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+5V\""
+			(at 210.82 142.24 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "5af0294d-c2e0-461a-be31-5bfd2fd1d67a")
+		)
+		(instances
+			(project "MoonPhase"
+				(path "/5cb35ecb-29a2-4f40-9211-172c9f7696cb"
+					(reference "#PWR014")
 					(unit 1)
 				)
 			)
