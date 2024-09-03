@@ -4,7 +4,7 @@
  *  
  *****
  * 
- * Illuminator V1.0.0, June 2024
+ * Illuminator V1.1.0, June 2024
  * Copyright (C) 2024 D.L. Ehnebuske
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -41,31 +41,73 @@ const uint64_t toWn = 0b01111111111111111111111111111100000000000000000000000000
 const uint64_t atWx = 0b000000000000000000000000000000111111111111111111111111111110;
 const uint64_t atWn = 0b011111111111111111111111111111000000000000000000000000000000;
 
-Illuminator::Illuminator(byte pin1, byte pin2) {
+/**
+ * @brief Map a 0..100 sensor reading into its 0.0..1.0 trimmed log-based equivalent
+ * 
+ * @param ambPct    The 0..100 sensor reading
+ * @return float    The mapped equivalent
+ */
+static float ambientFactor(int16_t ambPct) {
+    float answer = (ambPct - IL_AMB_LOWEST) * 100.0 / (IL_AMB_HIGHEST - IL_AMB_LOWEST);
+    answer = answer > 100.0 ? 100.0 : answer < 0.0 ? 0.0 : answer;
+    answer = log10(1 + IL_AMB_COEFF * answer) / log10(1 + IL_AMB_COEFF * 100.0);
+    return answer;
+}
+
+Illuminator::Illuminator(byte pin1, byte pin2, byte pin3) {
     waxingPin = pin1;
     waningPin = pin2;
+    sensorPin = pin3;
 }
 
 void Illuminator::begin() {
-    analogWriteFreq(ANALOG_WRITE_FREQ);
-    analogWriteRange(ANALOG_RANGE);
+    analogWriteFreq(IL_ANALOG_WRITE_FREQ);
+    analogWriteRange(IL_ANALOG_RANGE);
     pinMode(waxingPin, OUTPUT);
     digitalWrite(waxingPin, LOW);
+    waxingIsLit = false;
     pinMode(waningPin, OUTPUT);
     digitalWrite(waningPin, LOW);
+    waningIsLit = false;
+    analogReadResolution(IL_ANALOG_READ_RES);
+    pinMode(sensorPin, INPUT);
+    curAmbient = readAmbient();
+    lastAmbientMillis = millis();
     curBright = 100;
-    waxingMaxDuty = DEFAULT_MAX_DUTY;
-    waningMaxDuty = DEFAULT_MAX_DUTY;
+    waxingMaxDuty = IL_DEFAULT_MAX_DUTY;
+    waningMaxDuty = IL_DEFAULT_MAX_DUTY;
     #ifdef IL_DEBUG
-    Serial.printf("Illuminator::begin - Illuminator waxing pin: %d, waning pin: %d.\n", waxingPin, waningPin);
+    Serial.printf("Illuminator::begin - Illuminator waxing pin: %d, waning pin: %d, sensor pin %d.\n", waxingPin, waningPin, sensorPin);
     #endif
+}
+
+void Illuminator::run() {
+    unsigned long curMillis = millis();
+    if (curMillis - lastAmbientMillis > IL_AMB_UPD_MILLIS) {
+        int16_t newAmbient = (curAmbient * (IL_AMB_SMOOTHING - 1) + readAmbient()) / IL_AMB_SMOOTHING;
+        if (newAmbient != curAmbient) {
+            curAmbient = newAmbient;
+            float b = ambientFactor(curAmbient) * (curBright / 100.0);
+            int16_t waxingDuty = waxingIsLit ? (int16_t)(b * waxingMaxDuty) : 0;
+            int16_t waningDuty = waningIsLit ? (int16_t)(b * waningMaxDuty) : 0;
+            analogWrite(waxingPin, waxingDuty);
+            analogWrite(waningPin, waningDuty);
+            #ifdef IL_DEBUG
+            Serial.printf("Illuminator::run - curAmbient: %d, ambientFactor: %f, waxingDuty: %d, waningDuty: %d\n", 
+                curAmbient, ambientFactor(curAmbient), waxingDuty, waningDuty);
+            #endif
+        }
+        lastAmbientMillis = curMillis;
+    }
 }
 
 void Illuminator::toPhase(int16_t phase) {
     phase = phase < 0 ? 0 : phase >= 60 ? 59 : phase;
-    float b = curBright / 100.0;
-    analogWrite(waxingPin, (toWx >> phase) & 1 ? (int16_t)(b * waxingMaxDuty) : 0);
-    analogWrite(waningPin, (toWn >> phase) & 1 ? (int16_t)(b * waningMaxDuty) : 0);
+    waxingIsLit = ((toWx >> phase) & 1) != 0;
+    waningIsLit = ((toWn >> phase) & 1) != 0;
+    float b = ambientFactor(curAmbient) * (curBright / 100.0);
+    analogWrite(waxingPin, waxingIsLit ? (int16_t)(b * waxingMaxDuty) : 0);
+    analogWrite(waningPin, waningIsLit & 1 ? (int16_t)(b * waningMaxDuty) : 0);
     #ifdef IL_PHASE_DEBUG
     Serial.printf("Illuminator::toPhase - Illuminator to phase %d. waxing %s waning %s\n", 
         phase, (toWx >> phase) & 1 ? "on" : "off", (toWn >> phase) & 1 ? "on" : "off");
@@ -74,9 +116,11 @@ void Illuminator::toPhase(int16_t phase) {
 
 void Illuminator::atPhase(int16_t phase) {
     phase = phase < 0 ? 0 : phase >= 60 ? 59 : phase;
-    float b = curBright / 100.0;
-    analogWrite(waxingPin, (atWx >> phase) & 1 ? (int16_t)(b * waxingMaxDuty) : 0);
-    analogWrite(waningPin, (atWn >> phase) & 1 ? (int16_t)(b * waningMaxDuty) : 0);
+    waxingIsLit = ((atWx >> phase) & 1) != 0;
+    waningIsLit = ((atWn >> phase) & 1) != 0;
+    float b = ambientFactor(curAmbient) * (curBright / 100.0);
+    analogWrite(waxingPin, waxingIsLit ? (int16_t)(b * waxingMaxDuty) : 0);
+    analogWrite(waningPin, waningIsLit ? (int16_t)(b * waningMaxDuty) : 0);
     #ifdef IL_PHASE_DEBUG
     Serial.printf("Illuminator::atPhase - Illuminator at phase %d. waxing %s waning %s\n", 
         phase, (atWx >> phase) & 1 ? "on" : "off", (atWn >> phase) & 1 ? "on" : "off");
@@ -105,19 +149,19 @@ int16_t Illuminator::getMaxDuty(bool waxing) {
 }
 
 void Illuminator::setMaxDuty(int16_t newWaxingMaxDuty, int16_t newWaningMaxDuty) {
-    if (newWaxingMaxDuty >= 0 && newWaxingMaxDuty <= ANALOG_RANGE && newWaningMaxDuty >= 0 && newWaningMaxDuty <= ANALOG_RANGE) {
+    if (newWaxingMaxDuty >= 0 && newWaxingMaxDuty <= IL_ANALOG_RANGE && newWaningMaxDuty >= 0 && newWaningMaxDuty <= IL_ANALOG_RANGE) {
         waxingMaxDuty = newWaxingMaxDuty;
         waningMaxDuty = newWaningMaxDuty;
     #ifdef IL_DEBUG
     } else {
         Serial.printf("Illuminator::setMaxDuty - Duty cycle out of range 0 .. %d: %d, %d\n", 
-          ANALOG_RANGE, newWaxingMaxDuty, newWaningMaxDuty);
+          IL_ANALOG_RANGE, newWaxingMaxDuty, newWaningMaxDuty);
     #endif
     }
 }
 
 void Illuminator::setMaxDuty(bool waxing, int16_t newMaxDuty) {
-    if (newMaxDuty >= 0 && newMaxDuty <= ANALOG_RANGE) {
+    if (newMaxDuty >= 0 && newMaxDuty <= IL_ANALOG_RANGE) {
         if (waxing) {
             waxingMaxDuty = newMaxDuty;
         } else {
@@ -126,7 +170,21 @@ void Illuminator::setMaxDuty(bool waxing, int16_t newMaxDuty) {
     #ifdef IL_DEBUG
     } else {
         Serial.printf("Illuminator::setMaxDuty - maxDuty out of range 0 .. %d for %s: %d\n", 
-          ANALOG_RANGE, waxing ? "waxing" : "waning", newMaxDuty);
+          IL_ANALOG_RANGE, waxing ? "waxing" : "waning", newMaxDuty);
     #endif
     }
 }
+
+float Illuminator::getAmbient() {
+    return ambientFactor(curAmbient);
+}
+
+// Private member functions
+
+int16_t Illuminator::readAmbient() {
+    float sensorReading = analogRead(sensorPin);
+    for (uint8_t s = 1; s < IL_SENSOR_SAMPLES; s++) {
+        sensorReading += analogRead(sensorPin);
+    }
+    return static_cast<int16_t>(100 - ((sensorReading * 100) / (IL_SENSOR_SAMPLES * IL_ANALOG_FULLSCALE)));
+    }

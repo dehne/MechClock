@@ -4,7 +4,7 @@
  *  
  *****
  * 
- * MoonDisplay V1.0.0, June 2024
+ * MoonDisplay V1.1.0, June 2024
  * Copyright (C) 2024 D.L. Ehnebuske
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -39,12 +39,12 @@ static const float phasePva[60] = {     // Pivot angle (degrees) for each lunati
 
 // Public instance member functions
 
-MoonDisplay::MoonDisplay(const byte p[4], const byte l[4], const byte i[2]) {
+MoonDisplay::MoonDisplay(const byte p[4], const byte l[4], const byte i[3]) {
     pvMotor = new ULN2003();
     pvPins[0] = p[0]; pvPins[1] = p[1]; pvPins[2] = p[2]; pvPins[3] = p[3]; 
     lsMotor = new ULN2003();
     lsPins[0] = l[0]; lsPins[1] = l[1]; lsPins[2] = l[2]; lsPins[3] = l[3]; 
-    illum = new Illuminator {i[0], i[1]};
+    illum = new Illuminator {i[0], i[1], i[2]};
 }
 
 void MoonDisplay::begin(int32_t phase) {
@@ -65,9 +65,11 @@ void MoonDisplay::begin(int32_t phase) {
     #ifdef MD_DEBUG
     Serial.printf("MoonDisplay::begin - Starting at phase %d.\n", phase); 
     #endif
-    }
+}
 
-    int16_t MoonDisplay::run() {
+int16_t MoonDisplay::run() {
+    illum->run();   // Let the Illiminator do its thing
+
     // If no motors are running we might need to do something
     if (!lsMotor->isMoving() && !pvMotor->isMoving()) {
         // If the current and target phases don't match, we need to move the display
@@ -148,7 +150,7 @@ boolean MoonDisplay::showPhase(int16_t phase) {
         #endif
         return false;
     }
-    if (phase > 50 || phase < 0) {
+    if (phase > sizeof(phasePva)/sizeof(phasePva[0]) || phase < 0) {
         #ifdef MD_DEBUG
         Serial.printf("MoonDisplay::showPhase: Phase (%d) out of bounds; ignored.\n", phase);
         #endif

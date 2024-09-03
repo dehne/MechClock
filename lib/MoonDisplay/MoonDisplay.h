@@ -67,7 +67,7 @@
  * 
  *****
  * 
- * MoonDisplay V1.0.0, June 2024
+ * MoonDisplay V1.1.0, June 2024
  * Copyright (C) 2024 D.L. Ehnebuske
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -113,9 +113,9 @@ public:
      * 
      * @param p The GPIO pins for the pv stepper: {pvIn1, pvIn2,pvIn3, pvIn4}
      * @param l The GPIO pins for the ls stepper: {lsIn1, lsIn2, lsIn3, lsIn4}    
-     * @param i The GPIO pins for the illuminator: {ilIn1, ilIn2}
+     * @param i The GPIO pins for the illuminator: {ilIn1, ilIn2, ilIn3}
      */
-    MoonDisplay (const byte p[4], const byte l[4], const byte i[2]);
+    MoonDisplay (const byte p[4], const byte l[4], const byte i[3]);
 
     /**
      * @brief   Initialize the MoonDisplay assuming it is currently displaying the specified 

@@ -1,6 +1,6 @@
 /****
  * @file main.cpp
- * @version 1.0.0
+ * @version 1.1.0
  * @date August, 2024
  * 
  * This is the firmware for a moon phase display. The display consists of a picture of the full 
@@ -103,7 +103,7 @@
 #define WIFI_CONN_MAX_RETRY (3)                         // How many times to retry WiFi.begin() before giving up
 #define NTP_MAX_RETRY       (20)                        // How many times to retry getting the system clock set by NTP
 #define CONFIG_ADDR         (0)                         // Address of config structure in persistent memory
-#define BANNER              "MoonDisplay V1.0.0"
+#define BANNER              "MoonDisplay V1.1.0"        // Hello World message
 #define LUNAR_MONTH         (29.53059)                  // The (average) length of the lunar cycle in days
 #define PHASE_MILLIS        (42524050)                  // The interval in ms between display phase changes (29.53059/60 days)
 
@@ -122,8 +122,9 @@
 #define LS_IN4              (9)
 
 // Illuminator pin definitions
-#define IL_IN1              (11)
-#define IL_IN2              (10)
+#define IL_IN1              (11)                        // Waxing COB pin
+#define IL_IN2              (10)                        // Waning COB pin
+#define IL_IN3              (26)                        // Phototransistor pin
 
 /****
  *  Type definitions
@@ -174,9 +175,10 @@ const nvState_t defaultState = {
     .testing = true                 // Default for whether we're in testing mode or not
 };
 
+// GPIO pins for pivot motor, leadscrew motor, and the Illuminator's two LED COBs and its phototransistor
 const byte p[4] = {PV_IN1, PV_IN2, PV_IN3, PV_IN4};
 const byte l[4] = {LS_IN1, LS_IN2, LS_IN3, LS_IN4};
-const byte i[2] = {IL_IN1, IL_IN2};
+const byte i[3] = {IL_IN1, IL_IN2, IL_IN3};
 
 /****
  * Global variables
@@ -219,7 +221,7 @@ int32_t moonAgeSecsAt(time_t t) {
 /**
  * @brief Get the phase (0-59) of the moon at the specifed time.
  * 
- * NB:  The specified time must be on or after firstNewMoon (22:57UTC on JUly 5, 2024).
+ * NB:  The specified time must be on or after firstNewMoon (22:57UTC on July 5, 2024).
  * 
  * @param t         time_t time for which the phase is required
  * @return int16_t  The phase (0-59) at the specified time
