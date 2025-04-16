@@ -1,18 +1,19 @@
 /****
  * 
- * This file is a part of the MoonDisplay library. The library encapsulates a moon phase display 
- * consisting of a picture of the full moon, on top of which there lies a springy, flexible 
- * "terminator" running between two pivots placed at the northernmost and southernmost points of 
- * the moon photo. The northern one is free to turn. One end of the terminator is attached to this 
- * pivot. The terminator material passes across the photo to the southern pivot. It slides through 
- * that pivot and continues beyond it. The southern pivot can be twisted by a stepper motor 
- * (pvMotor). This twists the terminator material, settting the angle it makes with the southern 
- * extremity of the photo. The northern, freely rotating, pivot assumes whatever angle the forces 
- * on it dictate. 
+ * This file is a part of the MoonDisplay library. The library encapsulates a moon phase display. 
+ * 
+ * The display consists of a picture of the full moon, on top of which there is a springy, 
+ * flexible "terminator" that runs between two pivots placed at the northernmost and southernmost 
+ * points of the moon photo. The northern one is free to turn. One end of the terminator is 
+ * attached to this pivot. The terminator material passes across the photo to the southern pivot. 
+ * It slides through that pivot and continues beyond it. The southern pivot can be twisted by a 
+ * stepper motor (pvMotor). This twists the terminator material, setting the angle it makes with 
+ * the southern extremity of the photo. The northern, freely rotating, pivot assumes whatever 
+ * angle the forces on it dictate. 
  * 
  * As noted, the material forming the terminator is longer than the distance from the northern 
  * pivot to the southern one. After it passes through the southern (driven) pivot, its end is 
- * attached to the travelling part of a leadscrew mechanism the whole of which rotates with the 
+ * attached to the traveling part of a leadscrew mechanism the whole of which rotates with the 
  * pivot. The leadscrew mechanism, driven by another stepper motor (lsMotor) pushes or pulls the 
  * terminator material, sliding it through the pivot. Thus the position of the leadscrew 
  * determins the length of the terminator material the runs across the photo between the two 
@@ -20,7 +21,7 @@
  * 
  * By coordinating the operation of the two steppers we can form the terminator into various 
  * curves crossing the face of the photo. By doing so correctly we can approximate the the curves 
- * real terminator takes as it crosses the face of the real moon. Well, close enough to make a 
+ * the real terminator takes as it crosses the face of the real moon. Well, close enough to make a 
  * nice mechanical moon phase display, anyway.
  * 
  * Based on calibration runs of the as-built mechanism, if the position of the leadscrew (ls) as 
@@ -30,7 +31,7 @@
  * 
  * where -1600 <= pv <= 1600, the result is a (semi-credible) terminator path across the moon 
  * photo. (Here, ls is a measure of how much terminator material is stored in the leadscrew 
- * mechanism, so the length across the photo in inversely proportional to it. Positions of both 
+ * mechanism, so the length across the photo is inversely proportional to it. Positions of both 
  * motors is measured in steps.) 
  * 
  * For the purposes of the display, I've divided a lunation into 60 phases. Phase 0 is a new moon, 
@@ -58,17 +59,20 @@
  * the other is off, the part of the moon photo on the same side is illuminated, but the part of 
  * the photo on the other side is in (relative) darkness. 
  * 
- * In phases 0 - 29, only the right source is turned on, thus illuminating part of the moon phot 
- * corresponding to what's lit during the waxing phases of the lunation. During the full moon 
- * transition from phase 29 to 30, during which the terminator is reset, both sources are lit. 
- * During phases 30 - 59, only the right source is lit, lighting the part corresponding to what's 
- * lit during the moon's waning phases. During the new-moon transition from phase 59 to phase 0, 
- * while the terminator is reset, neither light source is lit.
+ * The illumination function is encpasulated in the Illuminator object. See Illuminator.h for 
+ * details.
+ * 
+ * The pattern used by MoonDisplay is the typical Arduino framework pattern for an encapsulated 
+ * device: 
+ *     1. Instantiate the object, passing it the GPIO pins it should use.
+ *     2. During initialization invoke begin the object's begin() member function.
+ *     3. During operation, invoke the run() member function as often as is feasible.
+ *     4. As needed, invoke other member functions to adjust the object's behavior.
  * 
  *****
  * 
- * MoonDisplay V1.1.0, June 2024
- * Copyright (C) 2024 D.L. Ehnebuske
+ * MoonDisplay V1.1.1, April 2025
+ * Copyright (C) 2024-2025 D.L. Ehnebuske
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -193,6 +197,24 @@ public:
      * 
      */
     void stop();
+
+    /**
+     * @brief Get the current ambient light reading, 0.0 (dark) to 1.0 (very bright)
+     * 
+     * @return int16_t The current ambient light reading, 0 ... 100
+     */
+    int16_t getAmbient();
+
+        /**
+     * @brief   Set the limits between which the illuminator is lit. If lower >= upper or the 
+     *          parameters are out of range, nothing happens.
+     * 
+     * @details Ambient light values are 0 ... 100, dark to light
+     * 
+     * @param lower If ambient light falls below this, the illuminator is off. Range: 0 ... 99
+     * @param upper If the ambient light is above this, the illuminator is maximally lit. Range: 1 ... 100
+     */
+void setAmbientLimits(int16_t lower, int16_t upper);
 
 private:
     ULN2003 *pvMotor;                       // Pointer to the pv stepper motor

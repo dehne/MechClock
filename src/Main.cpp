@@ -1,75 +1,33 @@
 /****
  * @file main.cpp
- * @version 1.1.0
- * @date August, 2024
+ * @version 1.1.1
+ * @date April 2025
  * 
- * This is the firmware for a moon phase display. The display consists of a picture of the full 
- * moon, on top of which there is a springy, flexible "terminator" that runs between two pivots 
- * placed at the northernmost and southernmost points of the moon photo. The northern one is free 
- * to turn. One end of the terminator is attached to this pivot. The terminator material passes 
- * across the photo to the southern pivot. It slides through that pivot and continues beyond it. 
- * The southern pivot can be twisted by a stepper motor (pvMotor). This twists the terminator 
- * material, set the angle it makes with the southern extremity of the photo. The northern, 
- * freely rotating, pivot assumes whatever angle the forces on it dictate. 
+ * This is the firmware for a moon phase display. It uses the Arduino framework and runs on a 
+ * Raspberry Pi Pico W. See MoonDisplay.h for details on ahow the display works display. 
  * 
- * As noted, the material forming the terminator is longer than the distance from the northern 
- * pivot to the southern one. After it passes through the southern (driven) pivot, its end is 
- * attached to the travelling part of a leadscrew mechanism the whole of which rotates with the 
- * pivot. The leadscrew mechanism, driven by another stepper motor (lsMotor) pushes or pulls the 
- * terminator material, sliding it through the pivot. Thus the position of the leadscrew 
- * determins the length of the terminator material the runs across the photo between the two 
- * pivots. 
+ * The basic function here is overall control of the device. In particular
  * 
- * By coordinating the operation of the two steppers we can form the terminator into various 
- * curves crossing the face of the photo. By doing so correctly we can approximate the the curves 
- * real terminator takes as it crosses the face of the real moon. Well, close enough to make a 
- * nice mechanical moon phase display, anyway.
- * 
- * Based on calibration runs of the as-built mechanism, if the position of the leadscrew (ls) as 
- * a function of pivot position (pv) is
- * 
- *      ls = 497671 + 30.5pv - 0.201pv^2
- * 
- * where -1600 <= pv <= 1600, the result is a (semi-credible) terminator path across the moon 
- * photo. (Here, ls is a measure of how much terminator material is stored in the leadscrew 
- * mechanism, so the length across the photo in inversely proportional to it. Positions of both 
- * motors is measured in steps.) 
- * 
- * For the purposes of the display, I've divided a lunation into 60 phases. Phase 0 is a new moon, 
- * phase 16 is the first quarter, phase 30 is the full moon and phase 45 is the third quarer moon. 
- * The transition from phase 59 to 0 brings us back to the new moon of the next lunation.
- * 
- * At the start of a lunation (new moon -- phase 0), pv is at its minimum (-1600) and the 
- * terminator is at its longest and is bent strongly to the right (the display is for earth's 
- * northern hemisphere). As time progresses, the phases increase step by step, showing the waxing 
- * crescent progression. At each phase, the steppers are operated to form the appropriate 
- * terminator. During the transition from phase 15 to 16, the terminator begins to bend to the 
- * left marking the progress of the gibbous moon until, at phase 29, it is at its maximum, bent 
- * strongly to the left at full moon. The transition from phase 29 to 30 involves moving the 
- * terminator from full left extension to full right so that it is in position to show the start 
- * of the waning gibbous moon. As the phases continue, the terminator makes its way across the 
- * moon photo, marking the lunation's waning phases, until, at the transition from phase 59 to 0, 
- * we're back at the new moon. Like the transition from phase 29 to 30, the transition from phase 
- * 59 to 0 requires the terminator to be reset from its extreme left position to its extreme 
- * right one.
- * 
- * In addition to the terminator and moon photo, the display has two low angle light sources that 
- * shine aross the moon photo, one from right to left, and the other from left to right. The 
- * terminator material stands tall enough above the photo to keep the light from shining on the 
- * part of the photo on the side away from the light source. Thus when one light source is on and 
- * the other is off, the part of the moon photo on the same side is illuminated, but the part of 
- * the photo on the other side is in (relative) darkness. 
- * 
- * In phases 0 - 29, only the right source is turned on, thus illuminating part of the moon phot 
- * corresponding to what's lit during the waxing phases of the lunation. During the full moon 
- * transition from phase 29 to 30, during which the terminator is reset, both sources are lit. 
- * During phases 30 - 59, only the right source is lit, lighting the part corresponding to what's 
- * lit during the moon's waning phases. During the new-moon transition from phase 59 to phase 0, 
- * while the terminator is reset, neither light source is lit.
+ *      * Managing persistent state:
+ *          - Info needed to connect to WiFi for NTP access
+ *          - Timezone info. (So we can talk in local time.)
+ *          - The current phase that the MoonDisplay is showing. (So that we can pick up again 
+ *            where we left off after a reboot. Updated each time we move the display.)
+ *          - Whether we're in "test" mode. (In test mode we don't move the display.)
+ *          - The ambient light level limits. (Below the min, lights are off, above the max, 
+ *            lights are fuly on.)
+ *          - Optionally, depending on a #define, watchdog data for the ULN2003Pico stepper 
+ *            library. (I was having trouble with delays in receiving iterrupts for a while.)
+ *      * Setting and maintaining the current time using WiFi, NTP and the system time() 
+ *        functions. 
+ *      * Blinking an LED to show we're alive.
+ *      * Initializing the MoonDisplay from persistent storage and then letting it run().
+ *      * Setting up and running command-line interpreter to let someone adjust and inspect the 
+ *        device.
  * 
  *****
  * 
- * Copyright (C) 2024 D.L. Ehnebuske
+ * Copyright (C) 2024-2025 D.L. Ehnebuske
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software 
  * and associated documentation files (the "Software"), to deal in the Software without 
@@ -92,6 +50,7 @@
 #include <WiFi.h>                                       // Pico WiFi support
 #include <CommandLine.h>                                // Terminal command line support
 #include <MoonDisplay.h>                                // The moon display mechanism
+#include <ULN2003Pico.h>                                // ULN2003Pico stepper motor drivers (only used for watchdog)
 
 //#define DEBUG                                           // Uncomment to enable debug printing
 
@@ -103,6 +62,7 @@
 #define WIFI_CONN_MAX_RETRY (3)                         // How many times to retry WiFi.begin() before giving up
 #define NTP_MAX_RETRY       (20)                        // How many times to retry getting the system clock set by NTP
 #define CONFIG_ADDR         (0)                         // Address of config structure in persistent memory
+#define WD_DATA_ADDR        sizeof(nvState_t)           // Address of watchdog data structure in persistent memory
 #define BANNER              "MoonDisplay V1.1.0"        // Hello World message
 #define LUNAR_MONTH         (29.53059)                  // The (average) length of the lunar cycle in days
 #define PHASE_MILLIS        (42524050)                  // The interval in ms between display phase changes (29.53059/60 days)
@@ -136,6 +96,8 @@ struct nvState_t {  // Type definition for configuration data stored in "EEPROM"
     char timezone[49];                  // The timezone in POSIX format
     int16_t curPhase;                   // The currently displayed phase
     boolean testing;                    // True if in testing mode false if running normally
+    uint8_t loAmbient;                  // Ambient light lower limit
+    uint8_t hiAmbient;                  // Ambient light upper limit
 };
 
 /****
@@ -172,7 +134,9 @@ const nvState_t defaultState = {
     .pw = "Set the PW",             // Place holder for Password
     .timezone = TIMEZONE,           // Default for timezone
     .curPhase = 0,                  // Default for the current phase number
-    .testing = true                 // Default for whether we're in testing mode or not
+    .testing = true,                // Default for whether we're in testing mode or not
+    .loAmbient = 4,                 // Default lower ambient light limit
+    .hiAmbient = 75                 // Default upper ambient light limit
 };
 
 // GPIO pins for pivot motor, leadscrew motor, and the Illuminator's two LED COBs and its phototransistor
@@ -193,8 +157,8 @@ bool wifiIsUp;                                          // True if we got connec
 bool clockIsSet;                                        // True if we managed to get the system clock set via WiFi, Internet and NTP
 
 /**
- * @brief   Returns true if a comes "before" b in modulo arithmetic. Basically, if it's shorter to
- *          go "forward" from a to b than it is to go "backward" from a to b.
+ * @brief   Returns true if a comes "before" b in unsigned long modulo arithmetic. Basically, if 
+ *          it's shorter to go "forward" from a to b than it is to go "backward" from a to b.
  * 
  * @param a
  * @param b 
@@ -278,6 +242,19 @@ bool setSysTimeFromNTP() {
     return true;
 }
 
+#ifdef UL_WATCHDOG
+String formatWdData(wdData_t wdData) {
+    if (!wdData.watchdogBarked) {
+        return "Watchdog did not bark.\n";
+    }
+    return "Watchdog barked: " +
+        (wdData.watchdogAlarmType == STEP_TIME ? String("Unreasonable step time") : wdData.watchdogAlarmType == CALLBACK ? String("Late to callback") : String("Next step already missed")) + 
+        ". Motor was " + String(wdData.watchdogMotor) + ", microsNextStep was " + String(wdData.watchdogMns) + 
+        ", steps to go was " + String(wdData.watchdogStg) + ", curMicros was " + String(wdData.watchdogCurMicros) + 
+        ", lastCurMicros was " + String(wdData.watchdogLastCurMicros) + ".\n";
+}
+#endif
+
 /**
  * @brief Get the status of the device as a String
  * 
@@ -302,6 +279,10 @@ String getStatus() {
     } else {
         answer += "Displayed moon phase is " + String(display.getPhase()) + ".\n";
     }
+    #ifdef UL_WATCHDOG
+    wdData_t wdData = EEPROM.get(WD_DATA_ADDR, wdData);
+    answer += formatWdData(wdData);
+    #endif
     return answer;
 }
 
@@ -315,23 +296,46 @@ String onHelp(CommandHandlerHelper *h) {
     return
         "help                   Display this text to the user\n"
         "h                      Same as \"help\"\n"
-        "assume <phase>         Assume display is showing phase <phase>\n"
+        "ambient [<lo> <hi>]    Display or set lower and upper ambient light limits\n"
+        "                         0 <= lo < hi <= 100\n"
+        "assume <phase>         Assume moon display is showing phase <phase>\n"
         "ls [<steps>]           Drive leadscrew by <steps>. + ==> out, - ==> in\n"
         "pv [<steps>]           Drive pivot by <steps>. + ==> CC, - ==> CW viewed from front\n"
         "save                   Save the current configuration data in persistent memory.\n"
         "                       Until a save is done or the phase of the moon changes,\n"
         "                       configuration changes are not made persistent.\n"
-        "show <phase>           Change display to show phase <phase>\n"
-        "status                 Report on the system's status.\n"
-        "stop                   Stop all motion immediately\n"
+        "show <phase>           Make moon display show phase <phase>\n"
+        "status                 Display the system's status.\n"
+        "stop                   Stop all moon display motion immediately\n"
         "s                      Same as \"stop\"\n"
-        "test [on|off]          Set or print whether we're in test mode\n"
+        "test [on|off]          Set or display whether we're in test mode\n"
         "tz [<POSIX tz>]        Set or display the POSIX-format timeszone to use.\n"
-        "                       Save to make persistent.\n"
+        "                       Save configuration to make persistent.\n"
+        #ifdef UL_WATCHDOG
+        "watchdog               Display and the reset the persistent watchdog data.\n"
+        #endif
+        "wifi                   Display the current ssid and pw.\n"
         "wifi pw <password>     Set the WiFi password to <password>.\n"
         "                       Save to make persistent.\n"
         "wifi ssid <ssid>       Set the WiFi SSID we should use to <ssid>\n"
         "                       Save to make persistent.\n";
+}
+
+String onAmbient(CommandHandlerHelper *h) {
+    String arg1 = h->getWord(1);
+    if (arg1.length() == 0) {
+        return "Current ambient light level is " + String(display.getAmbient()) + ", lowerLimit; " + String(state.loAmbient) + 
+            ", upper limit: " + String(state.hiAmbient) + "\n";
+    }
+    int16_t lowerLimit = arg1.toInt();
+    int16_t upperLimit = h->getWord(2).toInt();
+    if (lowerLimit < 0 || upperLimit > 100 || upperLimit <= lowerLimit) {
+        return "Ambient limits must be: 0 >= lower < upper <= 100\n";
+    }
+    state.loAmbient = lowerLimit;
+    state.hiAmbient = upperLimit;
+    display.setAmbientLimits(lowerLimit, upperLimit);
+    return "Ambient limits set to " + String(lowerLimit) + " " + String(upperLimit) + "\n";
 }
 
 /**
@@ -441,7 +445,6 @@ String onTest(CommandHandlerHelper *h) {
     if(h->getWord(1).equalsIgnoreCase("on")) {
         state.testing = true;
         return "Test mode on\n";
-        digitalWrite(LED, LOW); // The watchdog doesn't blink in test mode, so, in case it's on...
     } else if (h->getWord(1).equalsIgnoreCase("off")) {
         state.testing = false;
         nextPhaseChangeMillis = millis();
@@ -468,6 +471,30 @@ String onTz(CommandHandlerHelper* h) {
     strcpy(state.timezone, target.c_str());
     return String("Timezone set to '") + target + "'.\n";
 }
+
+#ifdef UL_WATCHDOG
+/**
+ * @brief   "watchdog" command handler: Display and the reset the persistent watchdog data.
+ * 
+ * @param h         The command handler helper we use to access what the user typed
+ * @return String   The result to be displayed to the user
+ */
+String onWatchdog(CommandHandlerHelper* h) {
+    wdData_t wdData = EEPROM.get(WD_DATA_ADDR, wdData);
+    wdData_t empty = {
+        .watchdogBarked = false,
+        .watchdogCurMicros = 0,
+        .watchdogAlarmType = CALLBACK,
+        .watchdogMotor = 0,
+        .watchdogMns = 0,
+        .watchdogStg = 0,
+        .watchdogLastCurMicros = 0
+    };
+    EEPROM.put(WD_DATA_ADDR, empty);
+    EEPROM.commit();
+    return formatWdData(wdData);
+}
+#endif
 
 /**
  * @brief   'wifi pw <password>' and 'wifi ssid <ssid>' commend handler: Set the WiFi password 
@@ -537,6 +564,7 @@ void setup() {
     // Initialize the command interpreter
     if (!(
         ui.attachCmdHandler("help", onHelp) && ui.attachCmdHandler("h", onHelp) &&
+        ui.attachCmdHandler("ambient", onAmbient) &&
         ui.attachCmdHandler("assume", onAssume) &&
         ui.attachCmdHandler("ls", onLs) && 
         ui.attachCmdHandler("pv", onPv) &&
@@ -546,6 +574,9 @@ void setup() {
         ui.attachCmdHandler("stop", onStop) && ui.attachCmdHandler("s", onStop) &&
         ui.attachCmdHandler("test", onTest) &&
         ui.attachCmdHandler("tz", onTz) &&
+        #ifdef UL_WATCHDOG
+        ui.attachCmdHandler("watchdog", onWatchdog) &&
+        #endif
         ui.attachCmdHandler("wifi", onWifi)
     )) {
         Serial.print("Too many command handlers.\n");
@@ -582,6 +613,7 @@ void setup() {
             nextPhaseChangeMillis = millis();
         }
     }
+    display.setAmbientLimits(state.loAmbient, state.hiAmbient);
 
     // Show we're ready to go
     Serial.print(getStatus());
@@ -590,7 +622,7 @@ void setup() {
 
 void loop() {
     static unsigned long nextBlinkMillis = millis() + PAUSE_MILLIS;
-    // If we're actually running, deal with blinking the watchdog LED
+    // If we're actually running, deal with blinking the "I'm running" LED
     if (clockIsSet && isBefore(nextBlinkMillis, millis())) {
         if (!state.testing) {
             if(digitalRead(LED) == HIGH) {
@@ -599,6 +631,15 @@ void loop() {
             } else {
                 digitalWrite(LED, HIGH);
                 nextBlinkMillis += BLINK_ON_MILLIS;
+                #ifdef UL_WATCHDOG
+                wdData_t wdData = ULN2003WatchdogDump();
+                if (wdData.watchdogBarked) {
+                    EEPROM.put(WD_DATA_ADDR, wdData);
+                    if(!EEPROM.commit()) {
+                        Serial.println("Unable to save watchdog data.");
+                    }
+                }
+                #endif
             }
         } else {
             nextBlinkMillis += BLINK_OFF_MILLIS;

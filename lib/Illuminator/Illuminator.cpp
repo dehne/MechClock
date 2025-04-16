@@ -4,8 +4,8 @@
  *  
  *****
  * 
- * Illuminator V1.1.0, June 2024
- * Copyright (C) 2024 D.L. Ehnebuske
+ * Illuminator V1.1.1, April 2025
+ * Copyright (C) 2024-2025 D.L. Ehnebuske
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -41,19 +41,6 @@ const uint64_t toWn = 0b01111111111111111111111111111100000000000000000000000000
 const uint64_t atWx = 0b000000000000000000000000000000111111111111111111111111111110;
 const uint64_t atWn = 0b011111111111111111111111111111000000000000000000000000000000;
 
-/**
- * @brief Map a 0..100 sensor reading into its 0.0..1.0 trimmed log-based equivalent
- * 
- * @param ambPct    The 0..100 sensor reading
- * @return float    The mapped equivalent
- */
-static float ambientFactor(int16_t ambPct) {
-    float answer = (ambPct - IL_AMB_LOWEST) * 100.0 / (IL_AMB_HIGHEST - IL_AMB_LOWEST);
-    answer = answer > 100.0 ? 100.0 : answer < 0.0 ? 0.0 : answer;
-    answer = log10(1 + IL_AMB_COEFF * answer) / log10(1 + IL_AMB_COEFF * 100.0);
-    return answer;
-}
-
 Illuminator::Illuminator(byte pin1, byte pin2, byte pin3) {
     waxingPin = pin1;
     waningPin = pin2;
@@ -74,6 +61,8 @@ void Illuminator::begin() {
     curAmbient = readAmbient();
     lastAmbientMillis = millis();
     curBright = 100;
+    lowAmbient = IL_AMB_LOWEST;
+    highAmbient = IL_AMB_HIGHEST;
     waxingMaxDuty = IL_DEFAULT_MAX_DUTY;
     waningMaxDuty = IL_DEFAULT_MAX_DUTY;
     #ifdef IL_DEBUG
@@ -93,8 +82,8 @@ void Illuminator::run() {
             analogWrite(waxingPin, waxingDuty);
             analogWrite(waningPin, waningDuty);
             #ifdef IL_DEBUG
-            Serial.printf("Illuminator::run - curAmbient: %d, ambientFactor: %f, waxingDuty: %d, waningDuty: %d\n", 
-                curAmbient, ambientFactor(curAmbient), waxingDuty, waningDuty);
+            Serial.printf("Illuminator::run - curAmbient: %d, ambientFactor: %f, waxingMaxDuty: %d, waxingDuty: %d, waningMaxDuty: %d, waningDuty: %d\n", 
+                curAmbient, ambientFactor(curAmbient), waxingMaxDuty, waxingDuty, waningMaxDuty, waningDuty);
             #endif
         }
         lastAmbientMillis = curMillis;
@@ -175,8 +164,17 @@ void Illuminator::setMaxDuty(bool waxing, int16_t newMaxDuty) {
     }
 }
 
-float Illuminator::getAmbient() {
-    return ambientFactor(curAmbient);
+
+int16_t Illuminator::getAmbient() {
+    return curAmbient;
+}
+
+void Illuminator::setAmbientLimits(int16_t lower, int16_t upper) {
+    if (lower >= upper || lower < 0 || upper > 100) {
+        return;
+    }
+    lowAmbient = lower;
+    highAmbient = upper;
 }
 
 // Private member functions
@@ -188,3 +186,10 @@ int16_t Illuminator::readAmbient() {
     }
     return static_cast<int16_t>(100 - ((sensorReading * 100) / (IL_SENSOR_SAMPLES * IL_ANALOG_FULLSCALE)));
     }
+
+float Illuminator::ambientFactor(int16_t ambPct) {
+    float answer = 100.0 * (ambPct - lowAmbient) / (highAmbient - lowAmbient);
+    answer = answer > 100.0 ? 100.0 : answer < 0.0 ? 0.0 : answer;
+    answer = log10(1 + IL_AMB_COEFF * answer) / log10(1 + IL_AMB_COEFF * 100.0);
+    return answer;
+}

@@ -4,8 +4,8 @@
  *  
  *****
  * 
- * MoonDisplay V1.1.0, June 2024
- * Copyright (C) 2024 D.L. Ehnebuske
+ * MoonDisplay V1.1.1, April 2025
+ * Copyright (C) 2024-2025 D.L. Ehnebuske
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -68,7 +68,7 @@ void MoonDisplay::begin(int32_t phase) {
 }
 
 int16_t MoonDisplay::run() {
-    illum->run();   // Let the Illiminator do its thing
+    illum->run();                       // Let the Illiminator do its thing
 
     // If no motors are running we might need to do something
     if (!lsMotor->isMoving() && !pvMotor->isMoving()) {
@@ -195,10 +195,17 @@ void MoonDisplay::turnPv(int32_t steps) {
     pvMotor->drive(steps);
 }
 
-
 void MoonDisplay::stop() {
     lsMotor->stop();
     pvMotor->stop();
     tgtPhase = curPhase;
     resetting = false;
+}
+
+int16_t MoonDisplay::getAmbient() {
+    return illum->getAmbient();
+}
+
+void MoonDisplay::setAmbientLimits(int16_t lower, int16_t upper) {
+    illum->setAmbientLimits(lower, upper);
 }
