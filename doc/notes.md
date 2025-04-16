@@ -47,3 +47,5 @@ Does it really matter all that much to me in this application? I'm guessing not.
 Hmmm. I don't see anything reported on [github](https://github.com/raspberrypi/pico-sdk/issues?page=1&q=is%3Aissue+callback) that looks similar to what I'm seeing. Maybe write a super simple test case to see if it turns up. Then add WiFi, and then NTP to see if I can provoke it? How much of a community helper do I feel like being? Answer: Not enough to set up a test environment in platformio that's based on the very latest SDK. Getting it wo work with Earl Pilhower's setup was tough enough.
 
 Several days later, and after going past full moon, the watchdog is still sleeping. Several more days and still sleeping. Now more than a month later, it's still working flawlessly. Time to change the firmware to store the data persistently if the watchdog barks so that I can hang the clock up and let it run but still access debugging data if something happens.
+
+Many months later and the watchdog never barked after loosening the criteria. So, no it doesn't really matter. Curious, though.
